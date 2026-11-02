@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+<PropertyGroup>
+	<OutputType>Exe</OutputType>
+	<TargetFramework>net8.0</TargetFramework>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Nullable>disable</Nullable>
+	<LangVersion>preview</LangVersion>
+	<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+</PropertyGroup>
+
+<ItemGroup>
+	<Content Include="libs\classdata.tpk">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	</Content>
+</ItemGroup>
+
+<ItemGroup>
+  <PackageReference Include="AssetsTools.NET" Version="3.0.5" />
+  <PackageReference Include="System.IO.Hashing" Version="10.0.14" />
+</ItemGroup>
+
+<Target Name="MoveDependenciesToSubfolder" AfterTargets="Build">
+	<ItemGroup>
+		<DependencyFiles Include="$(TargetDir)*.dll" Exclude="$(TargetPath)" />
+		<DependencyFiles Include="$(TargetDir)*.pdb" Exclude="$(TargetDir)$(TargetName).pdb" />
+		<DependencyFiles Include="$(TargetDir)*.xml" Exclude="$(TargetDir)$(TargetName).xml" />
+	</ItemGroup>
+	
+	<Move SourceFiles="@(DependencyFiles)" DestinationFolder="$(TargetDir)/libs" OverwriteReadOnlyFiles="true" />
+</Target>
+
+</Project>
