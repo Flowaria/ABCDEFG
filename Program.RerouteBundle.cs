@@ -201,6 +201,7 @@ internal static partial class Program
             var packed = manager.LoadBundleFile(fileName + "-uncompressed", true);
             using (var w = new AssetsFileWriter(fileName + "-compressed"))
                 packed.file.Pack(w, options.Compression);
+
             Log.WriteLine($"[{fileName}] Compressed! (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
             #endregion
         }
@@ -211,6 +212,7 @@ internal static partial class Program
         finally
         {
             manager.UnloadAll(unloadClassData: false);
+            File.Delete(fileName + "-uncompressed");
             GC.Collect();
         }
     }
