@@ -30,6 +30,7 @@ internal static partial class Program
         {
             reroutableCache.FileStream.Flush();
         }
+        s_fileIndexCache.FileStream.Flush();
     }
 
     static void BuildCache(FileInfo fileInfo, int fileIndex)

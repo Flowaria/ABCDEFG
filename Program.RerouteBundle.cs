@@ -149,7 +149,7 @@ internal static partial class Program
                         fileIDField.AsInt = newFileID;
                         pathIDField.AsLong = newPathID;
                         modified = true;
-                        Log.WriteLine($" - [{fileName}] Rerouted PPtr: {parentName}.{field.FieldName} :: {fileID} {pathID} -> {newFileID} {newPathID}");
+                        //Log.WriteLine($" - [{fileName}] Rerouted PPtr: {parentName}.{field.FieldName} :: {fileID} {pathID} -> {newFileID} {newPathID}");
                     }
                 }
 

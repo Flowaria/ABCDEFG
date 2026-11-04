@@ -161,6 +161,7 @@ internal static partial class Program
 
         if (CFG.MaxThread == 1)
         {
+            var startTimeTotal = Stopwatch.GetTimestamp();
             foreach (var kv in fileToReroute)
             {
                 var startTime = Stopwatch.GetTimestamp();
@@ -169,6 +170,8 @@ internal static partial class Program
                 var elapsedSeconds = Stopwatch.GetElapsedTime(startTime).TotalSeconds;
                 Log.WriteLine($"Finished Compressing Bundle '{Path.GetFileName(kv.Key)}' (took {elapsedSeconds:0.000}s)");
             }
+            var elapsedAllSeconds = Stopwatch.GetElapsedTime(startTimeTotal).TotalSeconds;
+            Log.WriteLine($"Finished Compressing {fileToReroute.Count} Bundle(s) (took {elapsedAllSeconds:0.000}s)");
         }
         else
         {
@@ -177,6 +180,7 @@ internal static partial class Program
                 MaxDegreeOfParallelism = CFG.MaxThread
             };
 
+            var startTimeTotal = Stopwatch.GetTimestamp();
             Parallel.ForEach(fileToReroute, options, kv =>
             {
                 var startTime = Stopwatch.GetTimestamp();
@@ -185,6 +189,9 @@ internal static partial class Program
                 var elapsedSeconds = Stopwatch.GetElapsedTime(startTime).TotalSeconds;
                 Log.WriteLine($"Finished Compressing Bundle '{Path.GetFileName(kv.Key)}' (took {elapsedSeconds:0.000}s)");
             });
+
+            var elapsedAllSeconds = Stopwatch.GetElapsedTime(startTimeTotal).TotalSeconds;
+            Log.WriteLine($"Finished Compressing {fileToReroute.Count} Bundle(s) (took {elapsedAllSeconds:0.000}s)");
         }
     }
 
