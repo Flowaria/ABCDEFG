@@ -174,15 +174,15 @@ internal static partial class Program
                 var data = bundleInst.file.DataReader;
                 data.Position = streamInfo.Offset;
 
-                var bytes = data.ReadBytes((int)streamInfo.DecompressedSize);
+                var length = streamInfo.DecompressedSize;
                 var ms = new MemoryStream();
-                ulong pos = 0;
+                long pos = 0;
                 foreach ((ulong offset, uint size) in removedStreamRanges)
                 {
-                    ms.Write(bytes, (int)pos, (int)(offset - pos));
-                    pos = offset + size;
+                    LargeStreamUtil.CopyBlock(data.BaseStream, ms, pos, (long)offset - pos);
+                    pos = (long)(offset + size);
                 }
-                ms.Write(bytes, (int)pos, (int)((ulong)bytes.Length - pos));
+                LargeStreamUtil.CopyBlock(data.BaseStream, ms, pos, length - pos);
 
                 bundleInst.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(ms.ToArray());
                 ms.Dispose();
