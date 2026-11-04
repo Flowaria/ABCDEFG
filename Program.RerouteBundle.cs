@@ -164,7 +164,7 @@ internal static partial class Program
 
 
             #region Save AssetBundle
-            Log.WriteLine($"[{fileName}] Save Uncompressed Buffer");
+            Log.WriteLine($"[{fileName}] Save Rerouted Bundle");
             startTime = Stopwatch.GetTimestamp();
             bundleInst.file.BlockAndDirInfo.DirectoryInfos[0].SetNewData(inst.file);
 
@@ -188,18 +188,20 @@ internal static partial class Program
                 ms.Dispose();
             }
 
-            using (var w = new AssetsFileWriter(fileName + "-uncompressed"))
+            using (var w = new AssetsFileWriter(filePath + "-rerouted"))
                 bundleInst.file.Write(w);
             Log.WriteLine($"[{fileName}] Saved! (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
             #endregion
 
+            if (options.Compression == AssetBundleCompressionType.None)
+                return;
 
 
             #region Save AssetBundle
             Log.WriteLine($"[{fileName}] Compressing Bundle");
             startTime = Stopwatch.GetTimestamp();
-            var packed = manager.LoadBundleFile(fileName + "-uncompressed", true);
-            using (var w = new AssetsFileWriter(fileName + "-compressed"))
+            var packed = manager.LoadBundleFile(filePath + "-rerouted", true);
+            using (var w = new AssetsFileWriter(filePath + "-compressed"))
                 packed.file.Pack(w, options.Compression);
 
             Log.WriteLine($"[{fileName}] Compressed! (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
@@ -212,7 +214,7 @@ internal static partial class Program
         finally
         {
             manager.UnloadAll(unloadClassData: false);
-            File.Delete(fileName + "-uncompressed");
+            File.Delete(filePath + "-rerouted");
             GC.Collect();
         }
     }
