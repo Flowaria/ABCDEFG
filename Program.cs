@@ -9,7 +9,7 @@ namespace ABCDEFG;
 
 internal static partial class Program
 {
-    static string Version => "0.1.0";
+    static string Version => "0.1.1";
 
     static readonly Dictionary<AssetClassID, ReroutableAssetCache> s_reroutableCaches = [];
     static FileIndexCache s_fileIndexCache;
