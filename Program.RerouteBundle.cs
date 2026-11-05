@@ -1,7 +1,6 @@
 ﻿using ABCDEFG.Utils;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
-using System.Diagnostics;
 
 namespace ABCDEFG;
 
@@ -14,21 +13,22 @@ internal static partial class Program
 
         try
         {
+
             #region Load Bundle File
-            Log.WriteLine($"[{fileName}] Start Loading");
-            var startTime = Stopwatch.GetTimestamp();
+            var jobTimeScope = new BundleJobScope(fileName, "Loading Bundle File");
 
             var bundleInst = manager.LoadBundleFile(filePath);
             var inst = manager.LoadAssetsFileFromBundle(bundleInst, 0, false);
             AssetsManagerPool.LoadClassDatabaseOf(inst.file.Metadata.UnityVersion);
-            Log.WriteLine($"[{fileName}] Loaded (took {GetElapsedSeconds(startTime)}s)");
+
+            jobTimeScope.Dispose();
             #endregion
 
 
-
             #region Look for reroutable assets
+            jobTimeScope = new BundleJobScope(fileName, "Looking for Assets and StreamData");
+
             var info = new ReroutingInfo();
-            Log.WriteLine($"[{fileName}] Start Look for reroutables and streamed");
             foreach (var assetInfo in inst.file.AssetInfos)
             {
                 if (!s_reroutableCaches.TryGetValue((AssetClassID)assetInfo.TypeId, out var reroutableCache))
@@ -40,7 +40,7 @@ internal static partial class Program
                 var asset = reroutableCache.FromBaseField(0, assetInfo.PathId, baseField);
                 if (!reroutableCache.FindRerouteTarget(asset, out var reroutable))
                 {
-                    Log.WriteLine($" - [{fileName}] Not Reroutable: [{(AssetClassID)assetInfo.TypeId}] '{asset}'");
+                    Log.Warning($"  [{fileName}] Found Non-Reroutable: [{(AssetClassID)assetInfo.TypeId}] '{asset}'");
                     continue;
                 }
 
@@ -52,19 +52,22 @@ internal static partial class Program
                 info.PathIDToExternalPPtr[assetInfo.PathId] = new(reroutable);
                 assetInfo.SetRemoved();
 
-                Log.WriteLine($" - [{fileName}] Reroutable: [{(AssetClassID)assetInfo.TypeId}] '{asset}'");
+                Log.Verbose($"  [{fileName}] Found Reroutable: [{(AssetClassID)assetInfo.TypeId}] '{asset}'");
             }
 
-            Log.WriteLine($"[{fileName}] Found {info.PathIDToExternalPPtr.Count} Reroutables (took {GetElapsedSeconds(startTime)}s)");
             if (info.PathIDToExternalPPtr.Count == 0)
+            {
                 return;
+            }
+
+            Log.WriteLine($"  [{fileName}] Found {info.PathIDToExternalPPtr.Count} Reroutable Assets");
+            jobTimeScope.Dispose();
             #endregion
 
 
-
             #region Inject External References
-            Log.WriteLine($"[{fileName}] Start Injecting Externals");
-            startTime = Stopwatch.GetTimestamp();
+            jobTimeScope = new BundleJobScope(fileName, "Injecting External References");
+
             var fileIndexes = info.PathIDToExternalPPtr.Select(x => x.Value.FileIndex).Distinct();
             foreach (var fileIndex in fileIndexes)
             {
@@ -82,16 +85,18 @@ internal static partial class Program
 
                 var fileID = inst.file.Metadata.Externals.Count;
                 info.FileIndexToFileID[fileIndex] = fileID;
-                Log.WriteLine($" - [{fileName}] Injected Externals: '{externalFileName}' ({fileID})");
+                Log.Verbose($"  [{fileName}] Injected Externals: '{externalFileName}' ({fileID})");
             }
-            Log.WriteLine($"[{fileName}] Injected {info.FileIndexToFileID.Count} External References (took {GetElapsedSeconds(startTime)}s)");
+
+            Log.WriteLine($"  [{fileName}] Injected {info.FileIndexToFileID.Count} Externals");
+            jobTimeScope.Dispose();
             #endregion
 
 
-
             #region Reroute PPtrs
-            Log.WriteLine($"[{fileName}] Start Rerouting PPtrs and Realign Offsets");
-            startTime = Stopwatch.GetTimestamp();
+            jobTimeScope = new BundleJobScope(fileName, "Rerouting PPtrs and Align Offsets");
+
+            int reroutedTotalCount = 0;
             foreach (var assetInfo in inst.file.AssetInfos)
             {
                 if (assetInfo.ReplacerType == ContentReplacerType.Remove)
@@ -110,21 +115,24 @@ internal static partial class Program
                     }
                 }
 
-                info.SearchPPtr(baseField, baseField.TypeName, ref modified);
+                int reroutedCount = 0;
+                info.SearchAndReroutePPtr(baseField, baseField.TypeName, ref reroutedCount);
 
-                if (modified)
+                reroutedTotalCount += reroutedCount;
+                if (modified || reroutedCount != 0)
                 {
                     assetInfo.SetNewData(baseField);
                 }
             }
-            Log.WriteLine($"[{fileName}] Rerouted {info.FileIndexToFileID.Count} PPtrs (took {GetElapsedSeconds(startTime)}s)");
+
+            Log.WriteLine($"  [{fileName}] Rerouted {reroutedTotalCount} PPtrs");
+            jobTimeScope.Dispose();
             #endregion
 
 
+            #region Align StreamData
+            jobTimeScope = new BundleJobScope(fileName, "Aligning StreamData");
 
-            #region Save AssetBundle
-            Log.WriteLine($"[{fileName}] Realigning StreamData");
-            startTime = Stopwatch.GetTimestamp();
             bundleInst.file.BlockAndDirInfo.DirectoryInfos[0].SetNewData(inst.file);
 
             if (info.RemovedStreamRanges.Count != 0)
@@ -138,20 +146,23 @@ internal static partial class Program
                 long pos = 0;
                 foreach ((ulong offset, uint size) in info.RemovedStreamRanges.Values)
                 {
+                    Log.Verbose($"  [{fileName}] Skip stripped data from: {offset} size: {size}");
                     LargeStreamUtil.CopyBlock(data.BaseStream, newData, pos, (long)offset - pos);
                     pos = (long)(offset + size);
                 }
                 LargeStreamUtil.CopyBlock(data.BaseStream, newData, pos, length - pos);
 
                 bundleInst.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(newData.ToArray());
+                Log.WriteLine($"  [{fileName}] Stripped {LargeStreamUtil.BufferLengthToString(length - newData.Length)} from StreamData");
                 newData.Dispose();
             }
+
+            jobTimeScope.Dispose();
             #endregion
 
 
-
-            #region Save AssetBundle
-            Log.WriteLine($"[{fileName}] Saving Bundle (Compression: {options.Compression})");
+            #region Save Rerouted Bundle
+            jobTimeScope = new BundleJobScope(fileName, "Saving Rerouted Bundle");
 
             var reroutedFileName = options.NoCompression ? options.GetCompressedFilePath(filePath) : options.GetReroutedFilePath(filePath);
             using var reroutedStream = OpenReroutedBundleStream(reroutedFileName);
@@ -159,24 +170,30 @@ internal static partial class Program
             bundleInst.file.Write(bundleFileWriter);
             bundleFileWriter.Flush();
 
-            if (options.Compression == AssetBundleCompressionType.None)
+            if (options.NoCompression)
             {
-                Log.WriteLine($"[{fileName}] Saved! (took {GetElapsedSeconds(startTime)}s)");
+                jobTimeScope.Dispose();
                 return;
             }
 
-            Log.WriteLine($"[{fileName}] Saved Uncompressed Buffer! (took {GetElapsedSeconds(startTime)}s)");
-            startTime = Stopwatch.GetTimestamp();
+            jobTimeScope.Dispose();
+            #endregion
+
+
+            #region Compress Saved Bundle
+            jobTimeScope = new BundleJobScope(fileName, $"Compressing Saved Bundle (Compression: {options.Compression})");
+
             var packed = manager.LoadBundleFile(reroutedStream, reroutedFileName, true);
             using var compressedFileWriter = new AssetsFileWriter(options.GetCompressedFilePath(filePath));
             packed.file.Pack(compressedFileWriter, options.Compression);
 
-            Log.WriteLine($"[{fileName}] Saved Compressed Bundle! (took {GetElapsedSeconds(startTime)}s)");
+            jobTimeScope.Dispose();
             #endregion
+
         }
         catch (Exception e)
         {
-            Log.WriteLine($"Skipping '{fileName}' : {e}");
+            Log.Error($"Skipping '{fileName}' : {e}");
         }
         finally
         {
@@ -196,11 +213,6 @@ internal static partial class Program
         {
             return new MemoryStream();
         }
-    }
-
-    static string GetElapsedSeconds(long startTime)
-    {
-        return Stopwatch.GetElapsedTime(startTime).TotalSeconds.ToString("0.000");
     }
 
     static bool HasStreamDataField(AssetTypeValueField parentField, out StreamDataRange dataRange)

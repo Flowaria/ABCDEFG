@@ -68,7 +68,7 @@ internal static partial class Program
         }
         catch (Exception e)
         {
-            Log.WriteLine($"Skipping '{fileInfo.Name}': {e}");
+            Log.Error($"Skipping '{fileInfo.Name}': {e}");
         }
         finally
         {

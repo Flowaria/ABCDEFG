@@ -25,4 +25,16 @@ internal static class LargeStreamUtil
             ArrayPool<byte>.Shared.Return(buffer);
         }
     }
+
+    static readonly string[] s_SizeSuffix = ["B", "KB", "MB", "GB", "TB", "PB", "EB"];
+    public static string BufferLengthToString(long byteCount)
+    {
+        if (byteCount == 0)
+            return "0" + s_SizeSuffix[0];
+
+        long bytes = Math.Abs(byteCount);
+        int place = Convert.ToInt32(Math.Floor(Math.Log(bytes, 1024)));
+        double num = Math.Round(bytes / Math.Pow(1024, place), 1);
+        return (Math.Sign(byteCount) * num).ToString() + s_SizeSuffix[place];
+    }
 }

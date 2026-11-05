@@ -40,14 +40,14 @@ internal sealed class ReroutingInfo
         return originalOffset - shift;
     }
 
-    public void SearchPPtr(AssetTypeValueField field, string parentName, ref bool modified)
+    public void SearchAndReroutePPtr(AssetTypeValueField field, string parentName, ref int reroutedCount)
     {
         foreach (var inField in field.Children)
         {
             var fileIDField = inField["m_FileID"];
             if (fileIDField == AssetTypeValueField.DUMMY_FIELD)
             {
-                SearchPPtr(inField, $"{parentName}.{inField.FieldName}", ref modified);
+                SearchAndReroutePPtr(inField, $"{parentName}.{inField.FieldName}", ref reroutedCount);
                 continue;
             }
 
@@ -67,7 +67,7 @@ internal sealed class ReroutingInfo
             var newPathID = pair.PathID;
             fileIDField.AsInt = newFileID;
             pathIDField.AsLong = newPathID;
-            modified = true;
+            reroutedCount++;
             //Log.WriteLine($" - [{fileName}] Rerouted PPtr: {parentName}.{field.FieldName} :: {fileID} {pathID} -> {newFileID} {newPathID}");
         }
     }

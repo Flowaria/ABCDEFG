@@ -17,6 +17,7 @@ internal static partial class Program
     internal static readonly string BasePath = AppDomain.CurrentDomain.BaseDirectory;
     internal static readonly string ConfigFile = Path.Combine(BasePath, "config.json");
     internal static readonly string LogFile = Path.Combine(BasePath, "output.log");
+    internal static readonly string ErrorLogFile = Path.Combine(BasePath, "error.log");
     internal static Config CFG;
 
     static void Main(string[] args)
@@ -27,7 +28,7 @@ internal static partial class Program
         }
         catch (Exception ex)
         {
-            Log.WriteLine(ex.ToString());
+            Log.Error(ex.ToString());
         }
 
         Log.FlushLog();
@@ -35,14 +36,14 @@ internal static partial class Program
 
     static void Run(string[] args)
     {
-        Log.Prepare(LogFile);
+        Log.Prepare(LogFile, ErrorLogFile);
         Log.WriteLine($"== Asset-Bundle-Compressor-Deluxe-Edition-For-GTFO ==");
         Log.WriteLine($" - Version: {Version}");
         Log.WriteLine($" - Base Path: {BasePath}");
         if (!File.Exists(ConfigFile))
         {
             Log.WriteLine();
-            Log.WriteLine($"config.json is missing!", ConsoleColor.Red);
+            Log.Error($"config.json is missing!");
 
             var configJson = JsonSerializer.Serialize(new Config(), new JsonSerializerOptions() { WriteIndented = true });
             File.WriteAllText(ConfigFile, configJson);
@@ -54,7 +55,7 @@ internal static partial class Program
         if (string.IsNullOrWhiteSpace(CFG.GTFODataPath))
         {
             Log.WriteLine();
-            Log.WriteLine($"Please set GTFODataPath on config.json!", ConsoleColor.Red);
+            Log.Error($"Please set GTFODataPath on config.json!");
             Thread.Sleep(2000);
             return;
         }
@@ -62,7 +63,7 @@ internal static partial class Program
         if (!File.Exists(Path.Combine(CFG.GTFODataPath, "app.info")))
         {
             Log.WriteLine();
-            Log.WriteLine($"GTFODataPath: '{CFG.GTFODataPath}' is invalid!", ConsoleColor.Red);
+            Log.Error($"GTFODataPath: '{CFG.GTFODataPath}' is invalid!");
             Thread.Sleep(2000);
             return;
         }
@@ -91,7 +92,6 @@ internal static partial class Program
         var argsRaw = string.Join(" ", args.Select(arg => (arg.Contains(' ') ? $"\"{arg}\"" : arg)));
         if (!string.IsNullOrWhiteSpace(argsRaw))
         {
-            Log.WriteLine();
             Log.WriteLine($"Used Arguments: ABCDEFG {argsRaw}");
         }
 
@@ -100,7 +100,7 @@ internal static partial class Program
         {
             WriteUsage();
             Log.WriteLine();
-            Log.WriteLine($"No arguments given. Do you want to generate the cache? (Press 'Y' to confirm)");
+            Log.WriteLine($"No arguments given. Do you want to generate the cache? (Press 'Y' to confirm)", ConsoleColor.Yellow);
             if (Console.ReadKey(intercept: true).Key != ConsoleKey.Y)
                 return;
 
@@ -127,11 +127,12 @@ internal static partial class Program
         if (s_fileIndexCache.IsFileEmpty)
         {
             Log.WriteLine();
-            Log.WriteLine($"Cache is missing! Please cache the AssetIDs first!", ConsoleColor.Red);
+            Log.Error($"Cache is missing! Please cache the AssetIDs first!");
             Thread.Sleep(2000);
             return;
         }
 
+        Log.WriteLine();
         LoadAllCache();
         var fileToReroute = ArgumentsParser.Parse(args);
 
