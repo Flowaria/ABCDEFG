@@ -11,7 +11,7 @@ internal static class AssemblyResolver
     [ModuleInitializer]
     internal static void Init()
     {
-        LibPath = Path.Combine(AppContext.BaseDirectory, "libs");
+        LibPath = Path.Combine(AppContext.BaseDirectory, "lib");
         AssemblyLoadContext.Default.Resolving += Resolve;
     }
 

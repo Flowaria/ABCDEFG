@@ -80,7 +80,7 @@ internal static partial class Program
             Thread.Sleep(2000);
         }
 
-        var cacheDirInfo = Directory.CreateDirectory(Path.Combine(BasePath, "caches"));
+        var cacheDirInfo = Directory.CreateDirectory(Path.Combine(BasePath, "cache"));
         var cacheDir = cacheDirInfo.FullName;
         s_reroutableCaches[AssetClassID.Material] = new ReroutableAssetCache<Material>(Path.Combine(cacheDir, "material.dat"));
         s_reroutableCaches[AssetClassID.Shader] = new ReroutableAssetCache<Shader>(Path.Combine(cacheDir, "shader.dat"));

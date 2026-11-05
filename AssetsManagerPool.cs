@@ -13,7 +13,7 @@ internal static class AssetsManagerPool
     static readonly ThreadLocal<AssetsManagerHolder> s_manager = new(() =>
     {
         var manager = new AssetsManager();
-        manager.LoadClassPackage(Path.Combine(Program.BasePath, "libs", "classdata.tpk"));
+        manager.LoadClassPackage(Path.Combine(Program.BasePath, "lib", "classdata.tpk"));
         return new()
         {
             Manager = manager

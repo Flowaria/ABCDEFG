@@ -10,7 +10,7 @@
 </PropertyGroup>
 
 <ItemGroup>
-	<Content Include="libs\classdata.tpk">
+	<Content Include="lib\classdata.tpk">
 		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	</Content>
 </ItemGroup>
@@ -27,7 +27,7 @@
 		<DependencyFiles Include="$(TargetDir)*.xml" Exclude="$(TargetDir)$(TargetName).xml" />
 	</ItemGroup>
 	
-	<Move SourceFiles="@(DependencyFiles)" DestinationFolder="$(TargetDir)/libs" OverwriteReadOnlyFiles="true" />
+	<Move SourceFiles="@(DependencyFiles)" DestinationFolder="$(TargetDir)/lib" OverwriteReadOnlyFiles="true" />
 </Target>
 
 </Project>
