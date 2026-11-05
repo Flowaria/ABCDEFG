@@ -1,6 +1,6 @@
 ﻿using System.Buffers;
 
-namespace ABCDEFG;
+namespace ABCDEFG.Utils;
 
 internal static class LargeStreamUtil
 {

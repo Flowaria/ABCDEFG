@@ -1,6 +1,6 @@
 ﻿using AssetsTools.NET.Extra;
 
-namespace ABCDEFG;
+namespace ABCDEFG.Utils;
 
 internal sealed class AssetsManagerHolder
 {

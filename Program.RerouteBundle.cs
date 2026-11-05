@@ -44,9 +44,9 @@ internal static partial class Program
                     continue;
                 }
 
-                if (HasStreamDataField(baseField, out var streamData) && streamData.size > 0)
+                if (HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
                 {
-                    info.RemovedStreamRanges.Add(streamData.offset, streamData);
+                    info.RemovedStreamRanges.Add(streamData.Offset, streamData);
                 }
 
                 info.PathIDToExternalPPtr[assetInfo.PathId] = new(reroutable);
@@ -65,7 +65,7 @@ internal static partial class Program
             #region Inject External References
             Log.WriteLine($"[{fileName}] Start Injecting Externals");
             startTime = Stopwatch.GetTimestamp();
-            var fileIndexes = info.PathIDToExternalPPtr.Select(x => x.Value.fileIndex).Distinct();
+            var fileIndexes = info.PathIDToExternalPPtr.Select(x => x.Value.FileIndex).Distinct();
             foreach (var fileIndex in fileIndexes)
             {
                 if (!s_fileIndexCache.TryGetFileName(fileIndex, out var externalFileName))
@@ -100,10 +100,10 @@ internal static partial class Program
                 var baseField = manager.GetBaseField(inst, assetInfo);
                 var modified = false;
 
-                if (HasStreamDataField(baseField, out var streamData) && streamData.size > 0)
+                if (HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
                 {
-                    var newOffset = info.RecalculateStreamDataOffset(streamData.offset);
-                    if (newOffset != streamData.offset)
+                    var newOffset = info.RecalculateStreamDataOffset(streamData.Offset);
+                    if (newOffset != streamData.Offset)
                     {
                         baseField["m_StreamData"]["offset"].AsULong = newOffset;
                         modified = true;
@@ -153,8 +153,7 @@ internal static partial class Program
             #region Save AssetBundle
             Log.WriteLine($"[{fileName}] Saving Bundle (Compression: {options.Compression})");
 
-            var reroutedFileSuffix = options.Compression == AssetBundleCompressionType.None ? "-compressed" : "-rerouted";
-            var reroutedFileName = filePath + reroutedFileSuffix;
+            var reroutedFileName = options.NoCompression ? options.GetCompressedFilePath(filePath) : options.GetReroutedFilePath(filePath);
             using var reroutedStream = OpenReroutedBundleStream(reroutedFileName);
             using var bundleFileWriter = new AssetsFileWriter(reroutedStream);
             bundleInst.file.Write(bundleFileWriter);
@@ -166,12 +165,13 @@ internal static partial class Program
                 return;
             }
 
+            Log.WriteLine($"[{fileName}] Saved Uncompressed Buffer! (took {GetElapsedSeconds(startTime)}s)");
             startTime = Stopwatch.GetTimestamp();
             var packed = manager.LoadBundleFile(reroutedStream, reroutedFileName, true);
-            using var compressedFileWriter = new AssetsFileWriter(filePath + "-compressed");
+            using var compressedFileWriter = new AssetsFileWriter(options.GetCompressedFilePath(filePath));
             packed.file.Pack(compressedFileWriter, options.Compression);
 
-            Log.WriteLine($"[{fileName}] Saved and Compressed! (took {GetElapsedSeconds(startTime)}s)");
+            Log.WriteLine($"[{fileName}] Saved Compressed Bundle! (took {GetElapsedSeconds(startTime)}s)");
             #endregion
         }
         catch (Exception e)
@@ -181,7 +181,7 @@ internal static partial class Program
         finally
         {
             manager.UnloadAll(unloadClassData: false);
-            File.Delete(filePath + "-rerouted");
+            File.Delete(options.GetReroutedFilePath(filePath));
             GC.Collect();
         }
     }

@@ -1,9 +1,8 @@
 ﻿using ABCDEFG.Caches;
 using ABCDEFG.Reroutables;
-using AssetsTools.NET;
+using ABCDEFG.Utils;
 using AssetsTools.NET.Extra;
 using System.Diagnostics;
-using System.Text;
 using System.Text.Json;
 
 namespace ABCDEFG;
@@ -14,7 +13,6 @@ internal static partial class Program
 
     static readonly Dictionary<AssetClassID, ReroutableAssetCache> s_reroutableCaches = [];
     static FileIndexCache s_fileIndexCache;
-
 
     internal static readonly string BasePath = AppDomain.CurrentDomain.BaseDirectory;
     internal static readonly string ConfigFile = Path.Combine(BasePath, "config.json");
@@ -90,6 +88,13 @@ internal static partial class Program
         s_reroutableCaches[AssetClassID.Texture3D] = new ReroutableAssetCache<Texture3D>(Path.Combine(cacheDir, "texture3D.dat"));
         s_fileIndexCache = new FileIndexCache(Path.Combine(cacheDir, "fileindex.dat"));
 
+        var argsRaw = string.Join(" ", args.Select(arg => (arg.Contains(' ') ? $"\"{arg}\"" : arg)));
+        if (!string.IsNullOrWhiteSpace(argsRaw))
+        {
+            Log.WriteLine();
+            Log.WriteLine($"Used Arguments: ABCDEFG {argsRaw}");
+        }
+
         bool doCache = false;
         if (args.Length == 0)
         {
@@ -128,36 +133,7 @@ internal static partial class Program
         }
 
         LoadAllCache();
-        var fileToReroute = new Dictionary<string, ReroutingFileOptions>(FileStringComparator());
-        AssetBundleCompressionType compressionType = AssetBundleCompressionType.LZMA;
-        foreach (var arg in args)
-        {
-            if (arg.StartsWith('-'))
-            {
-                ParseOptions(arg, ref compressionType);
-                continue;
-            }
-
-            var fullPath = Path.GetFullPath(arg);
-            if (Directory.Exists(arg))
-            {
-                foreach (var file in Directory.GetFiles(fullPath).Where(IsUnityFSFile))
-                {
-                    fileToReroute.Add(file, new ReroutingFileOptions()
-                    {
-                        Compression = compressionType
-                    });
-                }
-            }
-
-            if (IsUnityFSFile(fullPath))
-            {
-                fileToReroute.Add(fullPath, new ReroutingFileOptions()
-                {
-                    Compression = compressionType
-                });
-            }
-        }
+        var fileToReroute = ArgumentsParser.Parse(args);
 
         if (CFG.MaxThread == 1)
         {
@@ -195,75 +171,6 @@ internal static partial class Program
         }
     }
 
-    static byte[] s_UnityFSSignature = Encoding.ASCII.GetBytes("UnityFS");
-
-    static bool IsUnityFSFile(string file)
-    {
-        bool isUnityFS = false;
-        FileStream fs = null;
-
-        try
-        {
-            fs = File.OpenRead(file);
-            byte[] buffer = new byte[s_UnityFSSignature.Length];
-            fs.ReadExactly(buffer, 0, s_UnityFSSignature.Length);
-            isUnityFS = buffer.SequenceEqual(s_UnityFSSignature);
-        }
-        catch { }
-
-        fs?.Dispose();
-        return isUnityFS;
-    }
-
-    static StringComparer FileStringComparator()
-    {
-        // How .NET still doesn't have this??
-
-        var fileName = Guid.NewGuid().ToString() + ".case_test";
-        var temp = Path.Combine(Path.GetTempPath(), fileName);
-
-        try
-        {
-            File.WriteAllText(temp, string.Empty);
-            if (File.Exists(temp.ToUpper()))
-            {
-                return StringComparer.OrdinalIgnoreCase;
-            }
-
-            return StringComparer.Ordinal;
-        }
-        finally
-        {
-            File.Delete(temp);
-        }
-    }
-
-    static void ParseOptions(string arg, ref AssetBundleCompressionType compressionType)
-    {
-        switch (arg[1..].ToLower())
-        {
-            case "lzma":
-                compressionType = AssetBundleCompressionType.LZMA;
-                break;
-
-            case "lz4":
-                compressionType = AssetBundleCompressionType.LZ4;
-                break;
-
-            case "lz4hc":
-                compressionType = AssetBundleCompressionType.LZ4Fast;
-                break;
-
-            case "nocomp":
-                compressionType = AssetBundleCompressionType.None;
-                break;
-
-            default:
-                Log.WriteLine($"'{arg}' is not a valid option!");
-                break;
-        }
-    }
-
     static void WriteUsage()
     {
         Log.WriteLine("--------");
@@ -281,6 +188,8 @@ internal static partial class Program
         Log.WriteLine(" -lz4\t\t; Set trailing files compression to LZ4");
         Log.WriteLine(" -lz4hc\t\t; Set trailing files compression to LZ4HC");
         Log.WriteLine(" -nocomp\t; Don't compress trailing files (Rerouting still works)");
+        Log.WriteLine($" -{ArgumentsParser.OPT_OUTPUT_SUBDIR} <sub-directory name> ; Set trailing files output subdirectory (Default: \"\")");
+        Log.WriteLine($" -{ArgumentsParser.OPT_OUTPUT_SUFFIX} <suffix> ; Set trailing files output suffix (Default: -compressed)");
         Log.WriteLine("--------");
         Log.WriteLine("Example:");
         Log.WriteLine(" ABCDEFG -lzma \"geo_lab_01\" -lz4 \"gearpart_stock\" \"gearpart_front\"");

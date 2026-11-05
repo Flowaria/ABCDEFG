@@ -3,7 +3,7 @@ using AssetsTools.NET;
 
 namespace ABCDEFG;
 
-internal readonly record struct StreamDataRange(ulong offset, uint size) : IEquatable<StreamDataRange>
+internal readonly record struct StreamDataRange(ulong Offset, uint Size) : IEquatable<StreamDataRange>
 {
     public StreamDataRange(AssetTypeValueField streamData) :
         this(streamData["offset"].AsULong, streamData["size"].AsUInt)
@@ -12,12 +12,7 @@ internal readonly record struct StreamDataRange(ulong offset, uint size) : IEqua
     }
 }
 
-internal readonly record struct PPtr(int fileID, long toPathID)
-{
-
-}
-
-internal readonly record struct ExternalPPtr(int fileIndex, long pathID)
+internal readonly record struct ExternalPPtr(int FileIndex, long PathID)
 {
     public ExternalPPtr(ReroutableAsset asset) :
         this(asset.FileIndex, asset.PathID)
@@ -68,8 +63,8 @@ internal sealed class ReroutingInfo
             if (!PathIDToExternalPPtr.TryGetValue(pathID, out var pair))
                 continue;
 
-            var newFileID = FileIndexToFileID[pair.fileIndex];
-            var newPathID = pair.pathID;
+            var newFileID = FileIndexToFileID[pair.FileIndex];
+            var newPathID = pair.PathID;
             fileIDField.AsInt = newFileID;
             pathIDField.AsLong = newPathID;
             modified = true;
