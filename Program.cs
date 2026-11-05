@@ -80,15 +80,15 @@ internal static partial class Program
             Thread.Sleep(2000);
         }
 
-        var pathIDDirInfo = Directory.CreateDirectory(Path.Combine(BasePath, "caches"));
-        var pathIDDir = pathIDDirInfo.FullName;
-        s_reroutableCaches[AssetClassID.Material] = new ReroutableAssetCache<Material>(Path.Combine(pathIDDir, "material.dat"));
-        s_reroutableCaches[AssetClassID.Shader] = new ReroutableAssetCache<Shader>(Path.Combine(pathIDDir, "shader.dat"));
-        s_reroutableCaches[AssetClassID.Mesh] = new ReroutableAssetCache<Mesh>(Path.Combine(pathIDDir, "mesh.dat"));
-        s_reroutableCaches[AssetClassID.Texture2D] = new ReroutableAssetCache<Texture2D>(Path.Combine(pathIDDir, "texture2D.dat"));
-        s_reroutableCaches[AssetClassID.Texture2DArray] = new ReroutableAssetCache<Texture2DArray>(Path.Combine(pathIDDir, "texture2Darray.dat"));
-        s_reroutableCaches[AssetClassID.Texture3D] = new ReroutableAssetCache<Texture3D>(Path.Combine(pathIDDir, "texture3D.dat"));
-        s_fileIndexCache = new FileIndexCache(Path.Combine(pathIDDir, "fileindex.dat"));
+        var cacheDirInfo = Directory.CreateDirectory(Path.Combine(BasePath, "caches"));
+        var cacheDir = cacheDirInfo.FullName;
+        s_reroutableCaches[AssetClassID.Material] = new ReroutableAssetCache<Material>(Path.Combine(cacheDir, "material.dat"));
+        s_reroutableCaches[AssetClassID.Shader] = new ReroutableAssetCache<Shader>(Path.Combine(cacheDir, "shader.dat"));
+        s_reroutableCaches[AssetClassID.Mesh] = new ReroutableAssetCache<Mesh>(Path.Combine(cacheDir, "mesh.dat"));
+        s_reroutableCaches[AssetClassID.Texture2D] = new ReroutableAssetCache<Texture2D>(Path.Combine(cacheDir, "texture2D.dat"));
+        s_reroutableCaches[AssetClassID.Texture2DArray] = new ReroutableAssetCache<Texture2DArray>(Path.Combine(cacheDir, "texture2Darray.dat"));
+        s_reroutableCaches[AssetClassID.Texture3D] = new ReroutableAssetCache<Texture3D>(Path.Combine(cacheDir, "texture3D.dat"));
+        s_fileIndexCache = new FileIndexCache(Path.Combine(cacheDir, "fileindex.dat"));
 
         bool doCache = false;
         if (args.Length == 0)

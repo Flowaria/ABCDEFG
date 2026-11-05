@@ -1,4 +1,5 @@
-﻿using AssetsTools.NET;
+﻿using ABCDEFG.Utils;
+using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 using System.Diagnostics;
 
@@ -20,15 +21,14 @@ internal static partial class Program
             var bundleInst = manager.LoadBundleFile(filePath);
             var inst = manager.LoadAssetsFileFromBundle(bundleInst, 0, false);
             AssetsManagerPool.LoadClassDatabaseOf(inst.file.Metadata.UnityVersion);
-            Log.WriteLine($"[{fileName}] Loaded (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
+            Log.WriteLine($"[{fileName}] Loaded (took {GetElapsedSeconds(startTime)}s)");
             #endregion
 
 
 
             #region Look for reroutable assets
+            var info = new ReroutingInfo();
             Log.WriteLine($"[{fileName}] Start Look for reroutables and streamed");
-            var removedStreamRanges = new List<(ulong offset, uint size)>();
-            var internalPathIDToExternalPathID = new Dictionary<long, (long toPathID, int fileIndex)>();
             foreach (var assetInfo in inst.file.AssetInfos)
             {
                 if (!s_reroutableCaches.TryGetValue((AssetClassID)assetInfo.TypeId, out var reroutableCache))
@@ -44,21 +44,19 @@ internal static partial class Program
                     continue;
                 }
 
-                var streamData = baseField["m_StreamData"];
-                if (streamData != AssetTypeValueField.DUMMY_FIELD && streamData["size"].AsUInt > 0)
+                if (HasStreamDataField(baseField, out var streamData) && streamData.size > 0)
                 {
-                    removedStreamRanges.Add((streamData["offset"].AsULong, streamData["size"].AsUInt));
+                    info.RemovedStreamRanges.Add(streamData.offset, streamData);
                 }
+
+                info.PathIDToExternalPPtr[assetInfo.PathId] = new(reroutable);
                 assetInfo.SetRemoved();
 
-                internalPathIDToExternalPathID[assetInfo.PathId] = (reroutable.PathID, reroutable.FileIndex);
                 Log.WriteLine($" - [{fileName}] Reroutable: [{(AssetClassID)assetInfo.TypeId}] '{asset}'");
             }
 
-            removedStreamRanges.Sort((a, b) => a.offset.CompareTo(b.offset));
-
-            Log.WriteLine($"[{fileName}] Found {internalPathIDToExternalPathID.Count} Reroutables (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
-            if (internalPathIDToExternalPathID.Count == 0)
+            Log.WriteLine($"[{fileName}] Found {info.PathIDToExternalPPtr.Count} Reroutables (took {GetElapsedSeconds(startTime)}s)");
+            if (info.PathIDToExternalPPtr.Count == 0)
                 return;
             #endregion
 
@@ -67,12 +65,11 @@ internal static partial class Program
             #region Inject External References
             Log.WriteLine($"[{fileName}] Start Injecting Externals");
             startTime = Stopwatch.GetTimestamp();
-            var fileIndexes = internalPathIDToExternalPathID.Select(x => x.Value.fileIndex).Distinct();
-            var fileIndexToFileID = new Dictionary<int, int>();
+            var fileIndexes = info.PathIDToExternalPPtr.Select(x => x.Value.fileIndex).Distinct();
             foreach (var fileIndex in fileIndexes)
             {
                 if (!s_fileIndexCache.TryGetFileName(fileIndex, out var externalFileName))
-                    throw new DataMisalignedException($"{fileIndex} is missing in fileIndex cache!");
+                    throw new InvalidDataException($"{fileIndex} is missing in fileIndex cache!");
 
                 inst.file.Metadata.Externals.Add(new AssetsFileExternal()
                 {
@@ -82,17 +79,18 @@ internal static partial class Program
                     Guid = default,
                     VirtualAssetPathName = ""
                 });
+
                 var fileID = inst.file.Metadata.Externals.Count;
-                fileIndexToFileID[fileIndex] = fileID;
+                info.FileIndexToFileID[fileIndex] = fileID;
                 Log.WriteLine($" - [{fileName}] Injected Externals: '{externalFileName}' ({fileID})");
             }
-            Log.WriteLine($"[{fileName}] Injected {fileIndexToFileID.Count} External References (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
+            Log.WriteLine($"[{fileName}] Injected {info.FileIndexToFileID.Count} External References (took {GetElapsedSeconds(startTime)}s)");
             #endregion
 
 
 
             #region Reroute PPtrs
-            Log.WriteLine($"[{fileName}] Start Rerouting PPtrs and Realign");
+            Log.WriteLine($"[{fileName}] Start Rerouting PPtrs and Realign Offsets");
             startTime = Stopwatch.GetTimestamp();
             foreach (var assetInfo in inst.file.AssetInfos)
             {
@@ -102,109 +100,78 @@ internal static partial class Program
                 var baseField = manager.GetBaseField(inst, assetInfo);
                 var modified = false;
 
-                var streamData = baseField["m_StreamData"];
-                if (streamData != AssetTypeValueField.DUMMY_FIELD && streamData["size"].AsUInt > 0)
+                if (HasStreamDataField(baseField, out var streamData) && streamData.size > 0)
                 {
-                    var origOffset = streamData["offset"].AsULong;
-
-                    ulong shift = 0;
-                    foreach ((ulong offset, uint size) in removedStreamRanges)
-                        if (offset < origOffset) shift += size;
-                    var newOffset = origOffset - shift;
-
-                    if (newOffset != origOffset)
+                    var newOffset = info.RecalculateStreamDataOffset(streamData.offset);
+                    if (newOffset != streamData.offset)
                     {
-                        streamData["offset"].AsULong = newOffset;
+                        baseField["m_StreamData"]["offset"].AsULong = newOffset;
                         modified = true;
                     }
                 }
 
-                SearchPPtr(baseField, baseField.TypeName);
-
-                void SearchPPtr(AssetTypeValueField field, string parentName)
-                {
-                    foreach (var inField in field.Children)
-                    {
-                        var fileIDField = inField["m_FileID"];
-                        if (fileIDField == AssetTypeValueField.DUMMY_FIELD)
-                        {
-                            SearchPPtr(inField, $"{parentName}.{inField.FieldName}");
-                            continue;
-                        }
-
-                        var fileID = fileIDField.AsInt;
-                        if (fileID != 0)
-                            continue;
-
-                        var pathIDField = inField["m_PathID"];
-                        if (pathIDField == AssetTypeValueField.DUMMY_FIELD)
-                            continue;
-
-                        var pathID = pathIDField.AsLong;
-                        if (!internalPathIDToExternalPathID.TryGetValue(pathID, out var pair))
-                            continue;
-
-                        var newFileID = fileIndexToFileID[pair.fileIndex];
-                        var newPathID = pair.toPathID;
-                        fileIDField.AsInt = newFileID;
-                        pathIDField.AsLong = newPathID;
-                        modified = true;
-                        //Log.WriteLine($" - [{fileName}] Rerouted PPtr: {parentName}.{field.FieldName} :: {fileID} {pathID} -> {newFileID} {newPathID}");
-                    }
-                }
+                info.SearchPPtr(baseField, baseField.TypeName, ref modified);
 
                 if (modified)
                 {
                     assetInfo.SetNewData(baseField);
                 }
             }
-            Log.WriteLine($"[{fileName}] Rerouted {fileIndexToFileID.Count} PPtrs (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
+            Log.WriteLine($"[{fileName}] Rerouted {info.FileIndexToFileID.Count} PPtrs (took {GetElapsedSeconds(startTime)}s)");
             #endregion
 
 
 
             #region Save AssetBundle
-            Log.WriteLine($"[{fileName}] Save Rerouted Bundle");
+            Log.WriteLine($"[{fileName}] Realigning StreamData");
             startTime = Stopwatch.GetTimestamp();
             bundleInst.file.BlockAndDirInfo.DirectoryInfos[0].SetNewData(inst.file);
 
-            if (removedStreamRanges.Count != 0)
+            if (info.RemovedStreamRanges.Count != 0)
             {
-                var streamInfo = bundleInst.file.BlockAndDirInfo.DirectoryInfos[1];
+                var streamDatas = bundleInst.file.BlockAndDirInfo.DirectoryInfos[1];
                 var data = bundleInst.file.DataReader;
-                data.Position = streamInfo.Offset;
+                data.Position = streamDatas.Offset;
 
-                var length = streamInfo.DecompressedSize;
-                var ms = new MemoryStream();
+                var length = streamDatas.DecompressedSize;
+                var newData = new MemoryStream();
                 long pos = 0;
-                foreach ((ulong offset, uint size) in removedStreamRanges)
+                foreach ((ulong offset, uint size) in info.RemovedStreamRanges.Values)
                 {
-                    LargeStreamUtil.CopyBlock(data.BaseStream, ms, pos, (long)offset - pos);
+                    LargeStreamUtil.CopyBlock(data.BaseStream, newData, pos, (long)offset - pos);
                     pos = (long)(offset + size);
                 }
-                LargeStreamUtil.CopyBlock(data.BaseStream, ms, pos, length - pos);
+                LargeStreamUtil.CopyBlock(data.BaseStream, newData, pos, length - pos);
 
-                bundleInst.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(ms.ToArray());
-                ms.Dispose();
+                bundleInst.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(newData.ToArray());
+                newData.Dispose();
             }
-
-            using (var w = new AssetsFileWriter(filePath + "-rerouted"))
-                bundleInst.file.Write(w);
-            Log.WriteLine($"[{fileName}] Saved! (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
             #endregion
 
-            if (options.Compression == AssetBundleCompressionType.None)
-                return;
 
 
             #region Save AssetBundle
-            Log.WriteLine($"[{fileName}] Compressing Bundle");
-            startTime = Stopwatch.GetTimestamp();
-            var packed = manager.LoadBundleFile(filePath + "-rerouted", true);
-            using (var w = new AssetsFileWriter(filePath + "-compressed"))
-                packed.file.Pack(w, options.Compression);
+            Log.WriteLine($"[{fileName}] Saving Bundle (Compression: {options.Compression})");
 
-            Log.WriteLine($"[{fileName}] Compressed! (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
+            var reroutedFileSuffix = options.Compression == AssetBundleCompressionType.None ? "-compressed" : "-rerouted";
+            var reroutedFileName = filePath + reroutedFileSuffix;
+            using var reroutedStream = OpenReroutedBundleStream(reroutedFileName);
+            using var bundleFileWriter = new AssetsFileWriter(reroutedStream);
+            bundleInst.file.Write(bundleFileWriter);
+            bundleFileWriter.Flush();
+
+            if (options.Compression == AssetBundleCompressionType.None)
+            {
+                Log.WriteLine($"[{fileName}] Saved! (took {GetElapsedSeconds(startTime)}s)");
+                return;
+            }
+
+            startTime = Stopwatch.GetTimestamp();
+            var packed = manager.LoadBundleFile(reroutedStream, reroutedFileName, true);
+            using var compressedFileWriter = new AssetsFileWriter(filePath + "-compressed");
+            packed.file.Pack(compressedFileWriter, options.Compression);
+
+            Log.WriteLine($"[{fileName}] Saved and Compressed! (took {GetElapsedSeconds(startTime)}s)");
             #endregion
         }
         catch (Exception e)
@@ -217,5 +184,44 @@ internal static partial class Program
             File.Delete(filePath + "-rerouted");
             GC.Collect();
         }
+    }
+
+    static Stream OpenReroutedBundleStream(string reroutedBundleFileName)
+    {
+        if (CFG.WriteReroutedOnDisk)
+        {
+            return File.Open(reroutedBundleFileName, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
+        }
+        else
+        {
+            return new MemoryStream();
+        }
+    }
+
+    static string GetElapsedSeconds(long startTime)
+    {
+        return Stopwatch.GetElapsedTime(startTime).TotalSeconds.ToString("0.000");
+    }
+
+    static bool HasStreamDataField(AssetTypeValueField parentField, out StreamDataRange dataRange)
+    {
+        var streamData = parentField["m_StreamData"];
+        if (streamData.IsNullOrDummy())
+            goto Invalid;
+
+        var sizeField = streamData["size"];
+        if (sizeField.IsNullOrDummy())
+            goto Invalid;
+
+        var offsetField = streamData["offset"];
+        if (offsetField.IsNullOrDummy())
+            goto Invalid;
+
+        dataRange = new StreamDataRange(offsetField.AsULong, sizeField.AsUInt);
+        return true;
+
+    Invalid:
+        dataRange = default;
+        return false;
     }
 }
