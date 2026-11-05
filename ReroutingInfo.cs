@@ -26,6 +26,8 @@ internal sealed class ReroutingInfo
     public SortedList<ulong, StreamDataRange> RemovedStreamRanges = [];
     public Dictionary<long, ExternalPPtr> PathIDToExternalPPtr = [];
     public Dictionary<int, int> FileIndexToFileID = [];
+    public AssetBundleDirectoryInfo MainDirectoryInfo;
+    public AssetBundleDirectoryInfo StreamDataDirectoryInfo;
 
     public ulong RecalculateStreamDataOffset(ulong originalOffset)
     {

@@ -29,6 +29,9 @@ internal static partial class Program
             jobTimeScope = new BundleJobScope(fileName, "Looking for Assets and StreamData");
 
             var info = new ReroutingInfo();
+            var dirInfos = bundleInst.file.BlockAndDirInfo.DirectoryInfos;
+            info.MainDirectoryInfo = dirInfos[0];
+            info.StreamDataDirectoryInfo = dirInfos.Count > 1 ? dirInfos[1] : null;
             foreach (var assetInfo in inst.file.AssetInfos)
             {
                 if (!s_reroutableCaches.TryGetValue((AssetClassID)assetInfo.TypeId, out var reroutableCache))
@@ -44,9 +47,13 @@ internal static partial class Program
                     continue;
                 }
 
-                if (HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
+                if (info.StreamDataDirectoryInfo != null && HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
                 {
-                    info.RemovedStreamRanges.Add(streamData.Offset, streamData);
+                    var pathField = baseField["m_StreamData"]["path"];
+                    if (!pathField.IsNullOrDummy() && pathField.AsString.EndsWith(info.StreamDataDirectoryInfo.Name))
+                    {
+                        info.RemovedStreamRanges.Add(streamData.Offset, streamData);
+                    }
                 }
 
                 info.PathIDToExternalPPtr[assetInfo.PathId] = new(reroutable);
@@ -137,11 +144,10 @@ internal static partial class Program
 
             if (info.RemovedStreamRanges.Count != 0)
             {
-                var streamDatas = bundleInst.file.BlockAndDirInfo.DirectoryInfos[1];
                 var data = bundleInst.file.DataReader;
-                data.Position = streamDatas.Offset;
+                data.Position = info.StreamDataDirectoryInfo.Offset;
 
-                var length = streamDatas.DecompressedSize;
+                var length = info.StreamDataDirectoryInfo.DecompressedSize;
                 var newData = new MemoryStream();
                 long pos = 0;
                 foreach ((ulong offset, uint size) in info.RemovedStreamRanges.Values)
