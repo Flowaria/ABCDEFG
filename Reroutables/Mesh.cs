@@ -1,14 +1,16 @@
 ﻿using AssetsTools.NET;
+using System.IO.Hashing;
 
 namespace ABCDEFG.Reroutables;
 
 internal class Mesh : ReroutableAsset
 {
     public int IndicesCount { get; set; }
+    public uint IndicesHash { get; set; }
 
     public override bool IsSameAsset(ReroutableAsset other)
     {
-        if (!other.Name.Equals(Name, StringComparison.Ordinal))
+        if (!NameEqualsLoosen(other.Name, Name))
             return false;
 
         if (other is not Mesh otherMesh)
@@ -24,20 +26,23 @@ internal class Mesh : ReroutableAsset
     {
         var indices = baseField["m_IndexBuffer"]["Array"].AsByteArray;
         IndicesCount = indices.Length;
+        IndicesHash = XxHash32.HashToUInt32(indices);
     }
 
     public override void ReadExtra(BinaryReader reader)
     {
         IndicesCount = reader.Read7BitEncodedInt();
+        IndicesHash = reader.ReadUInt32();
     }
 
     public override void WriteExtra(BinaryWriter writer)
     {
         writer.Write7BitEncodedInt(IndicesCount);
+        writer.Write(IndicesHash);
     }
 
     public override string ToString()
     {
-        return $"{Name} ({IndicesCount} indices)";
+        return $"{Name} ({IndicesCount} indices - hash: {IndicesHash})";
     }
 }

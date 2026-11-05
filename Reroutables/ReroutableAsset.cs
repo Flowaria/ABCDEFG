@@ -1,8 +1,9 @@
 ﻿using AssetsTools.NET;
+using System.Text.RegularExpressions;
 
 namespace ABCDEFG.Reroutables;
 
-internal abstract class ReroutableAsset
+internal abstract partial class ReroutableAsset
 {
     public int FileIndex { get; set; }
     public long PathID { get; set; }
@@ -12,9 +13,27 @@ internal abstract class ReroutableAsset
     public virtual void ReadExtra(BinaryReader reader) { }
     public virtual void WriteExtra(BinaryWriter writer) { }
 
+    [GeneratedRegex(@"_[0-9]+$")]
+    private static partial Regex UnderScoreNumsSuffix();
+    private static readonly Regex s_UnderScoreNumsSuffix = UnderScoreNumsSuffix();
+
     public virtual void ReadNameFromBaseField(AssetTypeValueField baseField)
     {
         Name = baseField["m_Name"].AsString;
+    }
+
+    public static bool NameEqualsLoosen(string a, string b)
+    {
+        if (a.Equals(b, StringComparison.Ordinal))
+            return true;
+
+        if (a.Equals(s_UnderScoreNumsSuffix.Replace(b, ""), StringComparison.Ordinal))
+            return true;
+
+        if (b.Equals(s_UnderScoreNumsSuffix.Replace(a, ""), StringComparison.Ordinal))
+            return true;
+
+        return false;
     }
 
     public static T FromBaseField<T>(int fileIndex, long pathID, AssetTypeValueField baseField) where T : ReroutableAsset, new()
