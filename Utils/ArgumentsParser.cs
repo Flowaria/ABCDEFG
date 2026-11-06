@@ -10,8 +10,8 @@ internal static class ArgumentsParser
     public const string OPT_LZ4 = "lz4";
     public const string OPT_LZ4HC = "lz4hc";
 
-    public const string OPT_OUTPUT_SUFFIX = "out_suffix";
-    public const string OPT_OUTPUT_SUBDIR = "out_subdir";
+    public const string OPT_OUTPUT_SUFFIX = "output-suffix";
+    public const string OPT_OUTPUT_SUBDIR = "output-dir";
 
     public static Dictionary<string, ReroutingFileOptions> Parse(string[] args)
     {
@@ -34,7 +34,7 @@ internal static class ArgumentsParser
                 continue;
             }
 
-            if (arg.StartsWith('-'))
+            if (arg.StartsWith("--"))
             {
                 var optionName = arg[1..].ToLower();
                 ParseOptions(optionName, optionsData, ref compression, ref shouldParseData);
@@ -101,7 +101,7 @@ internal static class ArgumentsParser
         }
         else
         {
-            throw new ArgumentException("Argument is invalid!", $"-{optionName}");
+            throw new ArgumentException("Argument is invalid!", $"--{optionName}");
         }
     }
 

@@ -88,7 +88,7 @@ internal static partial class Program
 
             doCache = true;
         }
-        else if (args[0].Equals("-cache", StringComparison.OrdinalIgnoreCase))
+        else if (args[0].Equals("--cache", StringComparison.OrdinalIgnoreCase))
         {
             doCache = true;
         }
@@ -161,20 +161,20 @@ internal static partial class Program
         Log.WriteLine("--------");
         Log.WriteLine("Usage:");
         Log.WriteLine(" ABCDEFG");
-        Log.WriteLine(" ABCDEFG -cache");
+        Log.WriteLine(" ABCDEFG --cache");
         Log.WriteLine(" └ Generate Asset ID cache from given GTFO_Data path");
         Log.WriteLine();
         Log.WriteLine(" ABCDEFG <file/folder path> <file/folder path 2> ...");
-        Log.WriteLine(" ABCDEFG [-option] <file/folder path> [-option] <file/folder path 2> ...");
+        Log.WriteLine(" ABCDEFG [--option] <file/folder path> [--option] <file/folder path 2> ...");
         Log.WriteLine(" └ Compress given file(s) as LZMA (or option driven) compression");
         Log.WriteLine("--------");
         Log.WriteLine("Options:");
-        Log.WriteLine(" -lzma\t\t; Set trailing files compression to LZMA");
-        Log.WriteLine(" -lz4\t\t; Set trailing files compression to LZ4");
-        Log.WriteLine(" -lz4hc\t\t; Set trailing files compression to LZ4HC");
-        Log.WriteLine(" -nocomp\t; Don't compress trailing files (Rerouting still works)");
-        Log.WriteLine($" -{ArgumentsParser.OPT_OUTPUT_SUBDIR} <sub-directory name> ; Set trailing files output subdirectory (Default: \"\")");
-        Log.WriteLine($" -{ArgumentsParser.OPT_OUTPUT_SUFFIX} <suffix> ; Set trailing files output suffix (Default: -compressed)");
+        Log.WriteLine(" --lzma\t\t; Set trailing files compression to LZMA");
+        Log.WriteLine(" --lz4\t\t; Set trailing files compression to LZ4");
+        Log.WriteLine(" --lz4hc\t\t; Set trailing files compression to LZ4HC");
+        Log.WriteLine(" --nocomp\t; Don't compress trailing files (Rerouting still works)");
+        Log.WriteLine($" --{ArgumentsParser.OPT_OUTPUT_SUBDIR} <sub-directory name> ; Set trailing files output subdirectory (Default: \"\")");
+        Log.WriteLine($" --{ArgumentsParser.OPT_OUTPUT_SUFFIX} <suffix> ; Set trailing files output suffix (Default: -compressed)");
         Log.WriteLine("--------");
         Log.WriteLine("Example:");
         Log.WriteLine(" ABCDEFG -lzma \"geo_lab_01\" -lz4 \"gearpart_stock\" \"gearpart_front\"");
