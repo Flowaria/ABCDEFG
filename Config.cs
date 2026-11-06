@@ -2,6 +2,8 @@
 
 internal sealed class Config
 {
+    public static Config Instance { get; set; }
+
     public string GTFODataPath { get; set; } = string.Empty;
     public int MaxThread { get; set; } = 1;
     public bool WriteReroutedOnDisk { get; set; } = false;

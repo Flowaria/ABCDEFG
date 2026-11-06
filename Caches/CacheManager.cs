@@ -1,20 +1,49 @@
-﻿using ABCDEFG.Utils;
+﻿using ABCDEFG.Reroutables;
+using ABCDEFG.Utils;
 using AssetsTools.NET.Extra;
 using System.Diagnostics;
 
-namespace ABCDEFG;
+namespace ABCDEFG.Caches;
 
-internal static partial class Program
+internal static class CacheManager
 {
-    static void BuildAllCache()
+    public static readonly Dictionary<AssetClassID, ReroutableAssetCache> Reroutables = [];
+    public static FileIndexCache FileIndexes;
+
+    public static void Prepare(string cacheDir)
     {
-        foreach (var reroutableCache in s_reroutableCaches.Values)
+        Reroutables[AssetClassID.Material] = new ReroutableAssetCache<Material>(Path.Combine(cacheDir, "material.dat"));
+        Reroutables[AssetClassID.Shader] = new ReroutableAssetCache<Shader>(Path.Combine(cacheDir, "shader.dat"));
+        Reroutables[AssetClassID.Mesh] = new ReroutableAssetCache<Mesh>(Path.Combine(cacheDir, "mesh.dat"));
+        Reroutables[AssetClassID.Texture2D] = new ReroutableAssetCache<Texture2D>(Path.Combine(cacheDir, "texture2D.dat"));
+        Reroutables[AssetClassID.Texture2DArray] = new ReroutableAssetCache<Texture2DArray>(Path.Combine(cacheDir, "texture2Darray.dat"));
+        Reroutables[AssetClassID.Texture3D] = new ReroutableAssetCache<Texture3D>(Path.Combine(cacheDir, "texture3D.dat"));
+        FileIndexes = new FileIndexCache(Path.Combine(cacheDir, "fileindex.dat"));
+    }
+
+    public static void LoadAllCache()
+    {
+        var start = Stopwatch.GetTimestamp();
+        FileIndexes.ReadAll();
+        Log.WriteLine($"Loaded FileIndex cache (took {Stopwatch.GetElapsedTime(start).TotalSeconds:0.000}s)");
+
+        foreach (var reroutableCache in Reroutables.Values)
+        {
+            start = Stopwatch.GetTimestamp();
+            reroutableCache.ReadAll();
+            Log.WriteLine($"Loaded {reroutableCache.AssetTypeName} cache (took {Stopwatch.GetElapsedTime(start).TotalSeconds:0.000}s)");
+        }
+    }
+
+    public static void BuildAllCache()
+    {
+        foreach (var reroutableCache in Reroutables.Values)
         {
             reroutableCache.FileStream.SetLength(0);
             reroutableCache.FileStream.Seek(0, SeekOrigin.Begin);
         }
 
-        var files = new DirectoryInfo(CFG.GTFODataPath)
+        var files = new DirectoryInfo(Config.Instance.GTFODataPath)
             .EnumerateFiles()
             .Where(file => !file.Extension.Equals(".resS", StringComparison.Ordinal))
             .Where(file => !file.Extension.Equals(".config", StringComparison.Ordinal))
@@ -27,11 +56,11 @@ internal static partial class Program
             BuildCache(file, fileIndex++);
         }
 
-        foreach (var reroutableCache in s_reroutableCaches.Values)
+        foreach (var reroutableCache in Reroutables.Values)
         {
             reroutableCache.FileStream.Flush();
         }
-        s_fileIndexCache.FileStream.Flush();
+        FileIndexes.FileStream.Flush();
     }
 
     static void BuildCache(FileInfo fileInfo, int fileIndex)
@@ -48,7 +77,7 @@ internal static partial class Program
 
             foreach (var assetInfo in inst.file.AssetInfos)
             {
-                if (!s_reroutableCaches.TryGetValue((AssetClassID)assetInfo.TypeId, out var reroutableCache))
+                if (!Reroutables.TryGetValue((AssetClassID)assetInfo.TypeId, out var reroutableCache))
                 {
                     continue;
                 }
@@ -61,7 +90,7 @@ internal static partial class Program
 
             if (rawReferenceNumbers != 0)
             {
-                s_fileIndexCache.Write(fileIndex, fileInfo.Name);
+                FileIndexes.Write(fileIndex, fileInfo.Name);
             }
 
             Log.WriteLine($"Found {rawReferenceNumbers} in '{fileInfo.Name}' (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");

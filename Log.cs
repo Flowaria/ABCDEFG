@@ -59,7 +59,7 @@ internal static class Log
             Console.WriteLine(line);
             Console.ResetColor();
 
-            line = "[ERROR] " + line;
+            line = "[ERROR] " + line.Trim();
             _LogWriter.WriteLine(line);
             _ErrorWriter.WriteLine(line);
         }
@@ -73,7 +73,7 @@ internal static class Log
             Console.WriteLine(line);
             Console.ResetColor();
 
-            line = "[WARN] " + line;
+            line = "[WARN] " + line.Trim();
             _LogWriter.WriteLine(line);
             _ErrorWriter.WriteLine(line);
         }
@@ -81,7 +81,7 @@ internal static class Log
 
     public static void Verbose(string line)
     {
-        if (Program.CFG.LogVerbose)
+        if (Config.Instance.LogVerbose)
             WriteLine(line, ConsoleColor.DarkGray);
     }
 }

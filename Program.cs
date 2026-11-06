@@ -1,7 +1,5 @@
 ﻿using ABCDEFG.Caches;
-using ABCDEFG.Reroutables;
 using ABCDEFG.Utils;
-using AssetsTools.NET.Extra;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -10,15 +8,6 @@ namespace ABCDEFG;
 internal static partial class Program
 {
     static string Version => "0.1.1";
-
-    static readonly Dictionary<AssetClassID, ReroutableAssetCache> s_reroutableCaches = [];
-    static FileIndexCache s_fileIndexCache;
-
-    internal static readonly string BasePath = AppDomain.CurrentDomain.BaseDirectory;
-    internal static readonly string ConfigFile = Path.Combine(BasePath, "config.json");
-    internal static readonly string LogFile = Path.Combine(BasePath, "output.log");
-    internal static readonly string ErrorLogFile = Path.Combine(BasePath, "error.log");
-    internal static Config CFG;
 
     static void Main(string[] args)
     {
@@ -36,23 +25,23 @@ internal static partial class Program
 
     static void Run(string[] args)
     {
-        Log.Prepare(LogFile, ErrorLogFile);
+        Log.Prepare(Paths.LogFile, Paths.ErrorLogFile);
         Log.WriteLine($"== Asset-Bundle-Compressor-Deluxe-Edition-For-GTFO ==");
         Log.WriteLine($" - Version: {Version}");
-        Log.WriteLine($" - Base Path: {BasePath}");
-        if (!File.Exists(ConfigFile))
+        Log.WriteLine($" - Base Path: {Paths.BasePath}");
+        if (!File.Exists(Paths.ConfigFile))
         {
             Log.WriteLine();
             Log.Error($"config.json is missing!");
 
             var configJson = JsonSerializer.Serialize(new Config(), new JsonSerializerOptions() { WriteIndented = true });
-            File.WriteAllText(ConfigFile, configJson);
+            File.WriteAllText(Paths.ConfigFile, configJson);
             Thread.Sleep(2000);
             return;
         }
 
-        CFG = JsonSerializer.Deserialize<Config>(File.ReadAllText(ConfigFile));
-        if (string.IsNullOrWhiteSpace(CFG.GTFODataPath))
+        Config.Instance = JsonSerializer.Deserialize<Config>(File.ReadAllText(Paths.ConfigFile));
+        if (string.IsNullOrWhiteSpace(Config.Instance.GTFODataPath))
         {
             Log.WriteLine();
             Log.Error($"Please set GTFODataPath on config.json!");
@@ -60,34 +49,27 @@ internal static partial class Program
             return;
         }
 
-        if (!File.Exists(Path.Combine(CFG.GTFODataPath, "app.info")))
+        if (!File.Exists(Path.Combine(Config.Instance.GTFODataPath, "app.info")))
         {
             Log.WriteLine();
-            Log.Error($"GTFODataPath: '{CFG.GTFODataPath}' is invalid!");
+            Log.Error($"GTFODataPath: '{Config.Instance.GTFODataPath}' is invalid!");
             Thread.Sleep(2000);
             return;
         }
 
-        Log.WriteLine($" - GTFO_Data Path: {CFG.GTFODataPath}");
+        Log.WriteLine($" - GTFO_Data Path: {Config.Instance.GTFODataPath}");
         Log.WriteLine();
 
-        var maxThreads = Math.Clamp(CFG.MaxThread, 1, Environment.ProcessorCount);
-        if (maxThreads != CFG.MaxThread)
+        var maxThreads = Math.Clamp(Config.Instance.MaxThread, 1, Environment.ProcessorCount);
+        if (maxThreads != Config.Instance.MaxThread)
         {
-            Log.WriteLine($"MaxThread has clamped to {maxThreads}!", ConsoleColor.Yellow);
-            Log.WriteLine($" - It should be within range between 1~{Environment.ProcessorCount}!", ConsoleColor.Yellow);
+            Log.Warning($"MaxThread has clamped to {maxThreads}!");
+            Log.Warning($"It should be within range between 1~{Environment.ProcessorCount}!");
             Thread.Sleep(2000);
         }
 
-        var cacheDirInfo = Directory.CreateDirectory(Path.Combine(BasePath, "cache"));
-        var cacheDir = cacheDirInfo.FullName;
-        s_reroutableCaches[AssetClassID.Material] = new ReroutableAssetCache<Material>(Path.Combine(cacheDir, "material.dat"));
-        s_reroutableCaches[AssetClassID.Shader] = new ReroutableAssetCache<Shader>(Path.Combine(cacheDir, "shader.dat"));
-        s_reroutableCaches[AssetClassID.Mesh] = new ReroutableAssetCache<Mesh>(Path.Combine(cacheDir, "mesh.dat"));
-        s_reroutableCaches[AssetClassID.Texture2D] = new ReroutableAssetCache<Texture2D>(Path.Combine(cacheDir, "texture2D.dat"));
-        s_reroutableCaches[AssetClassID.Texture2DArray] = new ReroutableAssetCache<Texture2DArray>(Path.Combine(cacheDir, "texture2Darray.dat"));
-        s_reroutableCaches[AssetClassID.Texture3D] = new ReroutableAssetCache<Texture3D>(Path.Combine(cacheDir, "texture3D.dat"));
-        s_fileIndexCache = new FileIndexCache(Path.Combine(cacheDir, "fileindex.dat"));
+        var cacheDirInfo = Directory.CreateDirectory(Paths.CachePath);
+        CacheManager.Prepare(cacheDirInfo.FullName);
 
         var argsRaw = string.Join(" ", args.Select(arg => (arg.Contains(' ') ? $"\"{arg}\"" : arg)));
         if (!string.IsNullOrWhiteSpace(argsRaw))
@@ -117,14 +99,14 @@ internal static partial class Program
             Log.WriteLine($"Start generating cache");
 
             var startTime = Stopwatch.GetTimestamp();
-            BuildAllCache();
+            CacheManager.BuildAllCache();
 
             Log.WriteLine();
             Log.WriteLine($"Cache generated! (took {Stopwatch.GetElapsedTime(startTime).TotalSeconds:0.000}s)");
             return;
         }
 
-        if (s_fileIndexCache.IsFileEmpty)
+        if (CacheManager.FileIndexes.IsFileEmpty)
         {
             Log.WriteLine();
             Log.Error($"Cache is missing! Please cache the AssetIDs first!");
@@ -133,12 +115,17 @@ internal static partial class Program
         }
 
         Log.WriteLine();
-        LoadAllCache();
+        CacheManager.LoadAllCache();
         var fileToReroute = ArgumentsParser.Parse(args);
-
-        if (CFG.MaxThread == 1)
+        if (fileToReroute.Count == 0)
         {
-            var startTimeTotal = Stopwatch.GetTimestamp();
+            Log.Error($"No file arguments specified!");
+            Thread.Sleep(2000);
+        }
+
+        var startTimeTotal = Stopwatch.GetTimestamp();
+        if (Config.Instance.MaxThread == 1 || fileToReroute.Count == 1)
+        {
             foreach (var kv in fileToReroute)
             {
                 var startTime = Stopwatch.GetTimestamp();
@@ -147,17 +134,14 @@ internal static partial class Program
                 var elapsedSeconds = Stopwatch.GetElapsedTime(startTime).TotalSeconds;
                 Log.WriteLine($"Finished Compressing Bundle '{Path.GetFileName(kv.Key)}' (took {elapsedSeconds:0.000}s)");
             }
-            var elapsedAllSeconds = Stopwatch.GetElapsedTime(startTimeTotal).TotalSeconds;
-            Log.WriteLine($"Finished Compressing {fileToReroute.Count} Bundle(s) (took {elapsedAllSeconds:0.000}s)");
         }
         else
         {
             var options = new ParallelOptions()
             {
-                MaxDegreeOfParallelism = CFG.MaxThread
+                MaxDegreeOfParallelism = Config.Instance.MaxThread
             };
 
-            var startTimeTotal = Stopwatch.GetTimestamp();
             Parallel.ForEach(fileToReroute, options, kv =>
             {
                 var startTime = Stopwatch.GetTimestamp();
@@ -166,10 +150,10 @@ internal static partial class Program
                 var elapsedSeconds = Stopwatch.GetElapsedTime(startTime).TotalSeconds;
                 Log.WriteLine($"Finished Compressing Bundle '{Path.GetFileName(kv.Key)}' (took {elapsedSeconds:0.000}s)");
             });
-
-            var elapsedAllSeconds = Stopwatch.GetElapsedTime(startTimeTotal).TotalSeconds;
-            Log.WriteLine($"Finished Compressing {fileToReroute.Count} Bundle(s) (took {elapsedAllSeconds:0.000}s)");
         }
+
+        var elapsedAllSeconds = Stopwatch.GetElapsedTime(startTimeTotal).TotalSeconds;
+        Log.WriteLine($"Finished Compressing {fileToReroute.Count} Bundle(s) (took {elapsedAllSeconds:0.000}s)");
     }
 
     static void WriteUsage()

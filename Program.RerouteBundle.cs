@@ -1,4 +1,5 @@
-﻿using ABCDEFG.Utils;
+﻿using ABCDEFG.Caches;
+using ABCDEFG.Utils;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
 
@@ -34,7 +35,7 @@ internal static partial class Program
             info.StreamDataDirectoryInfo = dirInfos.Count > 1 ? dirInfos[1] : null;
             foreach (var assetInfo in inst.file.AssetInfos)
             {
-                if (!s_reroutableCaches.TryGetValue((AssetClassID)assetInfo.TypeId, out var reroutableCache))
+                if (!CacheManager.Reroutables.TryGetValue((AssetClassID)assetInfo.TypeId, out var reroutableCache))
                 {
                     continue;
                 }
@@ -78,7 +79,7 @@ internal static partial class Program
             var fileIndexes = info.PathIDToExternalPPtr.Select(x => x.Value.FileIndex).Distinct();
             foreach (var fileIndex in fileIndexes)
             {
-                if (!s_fileIndexCache.TryGetFileName(fileIndex, out var externalFileName))
+                if (!CacheManager.FileIndexes.TryGetFileName(fileIndex, out var externalFileName))
                     throw new InvalidDataException($"{fileIndex} is missing in fileIndex cache!");
 
                 inst.file.Metadata.Externals.Add(new AssetsFileExternal()
@@ -211,7 +212,7 @@ internal static partial class Program
 
     static Stream OpenReroutedBundleStream(string reroutedBundleFileName)
     {
-        if (CFG.WriteReroutedOnDisk)
+        if (Config.Instance.WriteReroutedOnDisk)
         {
             return File.Open(reroutedBundleFileName, FileMode.Create, FileAccess.ReadWrite, FileShare.Read);
         }
