@@ -176,6 +176,7 @@ internal static partial class Program
         Log.WriteLine($" --{ArgumentsParser.OPT_EXCLUDE} <regex> ; Exclude trailing files that match RegEx pattern (Default: None)");
         Log.WriteLine($" --{ArgumentsParser.OPT_OUTPUT_FORMAT} <format> ; Set trailing files output format (Default: {{FileName}}-compressed)");
         Log.WriteLine(" └ Allowed replacement texts: {FileName}");
+        Log.WriteLine($" --{ArgumentsParser.OPT_WRITE_METADATA} <true/false> ; Toggle if trailing files also generate .meta.json (Default: true)");
         Log.WriteLine("--------");
         Log.WriteLine("Example:");
         Log.WriteLine(" ABCDEFG -lzma \"geo_lab_01\" -lz4 \"gearpart_stock\" \"gearpart_front\"");

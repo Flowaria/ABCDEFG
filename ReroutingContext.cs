@@ -1,5 +1,8 @@
-﻿using ABCDEFG.Reroutables;
+﻿using ABCDEFG.Metadatas;
+using ABCDEFG.Reroutables;
 using AssetsTools.NET;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace ABCDEFG;
 
@@ -21,11 +24,12 @@ internal readonly record struct ExternalPPtr(int FileIndex, long PathID)
     }
 }
 
-internal sealed class ReroutingInfo
+internal sealed class ReroutingContext
 {
     public SortedList<ulong, StreamDataRange> RemovedStreamRanges = [];
     public Dictionary<long, ExternalPPtr> PathIDToExternalPPtr = [];
     public Dictionary<int, int> FileIndexToFileID = [];
+    public Dictionary<string, string> AssetNamesToAssetType = [];
     public AssetBundleDirectoryInfo MainDirectoryInfo;
     public AssetBundleDirectoryInfo StreamDataDirectoryInfo;
 
@@ -72,5 +76,51 @@ internal sealed class ReroutingInfo
             reroutedCount++;
             //Log.WriteLine($" - [{fileName}] Rerouted PPtr: {parentName}.{field.FieldName} :: {fileID} {pathID} -> {newFileID} {newPathID}");
         }
+    }
+
+    public void GenerateMetadata(string outputFile)
+    {
+        using var fs = File.OpenRead(outputFile);
+        using var md5 = MD5.Create();
+        var checksum = Convert.ToHexString(md5.ComputeHash(fs));
+        var metaFile = outputFile + ".meta.json";
+        var metadata = new BundleMetadata();
+
+        using var metaFS = File.Open(metaFile, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+        metaFS.Seek(0, SeekOrigin.Begin);
+
+        if (metaFS.Length != 0)
+        {
+            try
+            {
+                metadata = JsonSerializer.Deserialize<BundleMetadata>(metaFS);
+            }
+            finally
+            {
+                metaFS.Seek(0, SeekOrigin.Begin);
+            }
+        }
+
+        metadata.Checksum = checksum;
+
+        var assets = new Dictionary<string, AssetMetadata>();
+        foreach ((string path, string type) in AssetNamesToAssetType)
+        {
+            if (!metadata.Assets.TryGetValue(path, out var asset))
+            {
+                asset = new();
+                metadata.Assets[path] = asset;
+            }
+            asset.AssetType = type;
+            asset.Orphaned = false;
+        }
+
+        foreach (var toRemove in metadata.Assets.Where(asset => asset.Value.Orphaned).ToArray())
+        {
+            metadata.Assets.Remove(toRemove.Key);
+        }
+
+        metaFS.SetLength(0);
+        JsonSerializer.Serialize(metaFS, metadata, options: new() { WriteIndented = true });
     }
 }

@@ -13,6 +13,7 @@ internal static class ArgumentsParser
 
     public const string OPT_OUTPUT_FORMAT = "output-format";
     public const string OPT_EXCLUDE = "exclude";
+    public const string OPT_WRITE_METADATA = "write-metadata";
 
     public static Dictionary<string, ReroutingFileOptions> Parse(string[] args)
     {
@@ -23,7 +24,8 @@ internal static class ArgumentsParser
         var optionsData = new Dictionary<string, string>
         {
             [OPT_OUTPUT_FORMAT] = "{filename}-compressed",
-            [OPT_EXCLUDE] = ""
+            [OPT_EXCLUDE] = "",
+            [OPT_WRITE_METADATA] = "true",
         };
 
         Regex excludeRegex = null;
@@ -83,7 +85,8 @@ internal static class ArgumentsParser
             parsed.Add(fullPath, new ReroutingFileOptions()
             {
                 Compression = compression,
-                OutputFormat = optionsData[OPT_OUTPUT_FORMAT]
+                OutputFormat = optionsData[OPT_OUTPUT_FORMAT],
+                GenerateMetadata = bool.Parse(optionsData[OPT_WRITE_METADATA])
             });
         }
 

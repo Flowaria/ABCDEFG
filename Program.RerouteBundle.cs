@@ -30,10 +30,41 @@ internal static partial class Program
             #region Look for reroutable assets
             jobTimeScope = new BundleJobScope(fileName, "Looking for Assets and StreamData");
 
-            var info = new ReroutingInfo();
+            var context = new ReroutingContext();
             var dirInfos = bundleInst.file.BlockAndDirInfo.DirectoryInfos;
-            info.MainDirectoryInfo = dirInfos[0];
-            info.StreamDataDirectoryInfo = dirInfos.Count > 1 ? dirInfos[1] : null;
+            var bundle = inst.file.GetAssetsOfType(AssetClassID.AssetBundle).First();
+            var container = manager.GetBaseField(inst, bundle)["m_Container"]["Array"];
+            inst.file.GenerateQuickLookup();
+
+            foreach (var asset in container)
+            {
+                string assetPath = asset["first"].AsString;
+                AssetTypeValueField pptr = asset["second"]["asset"];
+
+                int fileID = pptr["m_FileID"].AsInt;
+                long pathID = pptr["m_PathID"].AsLong;
+                if (fileID != 0)
+                {
+                    Log.Warning($"  [{fileName}] Found AssetPath: '{assetPath}' but It's external asset!");
+                    context.AssetNamesToAssetType[assetPath] = "Unknown";
+                    continue;
+                }
+
+                var assetInfo = inst.file.GetAssetInfo(pathID);
+                if (assetInfo == null)
+                {
+                    Log.Warning($"  [{fileName}] Found AssetPath: '{assetPath}' but AssetInfo is missing!");
+                    context.AssetNamesToAssetType[assetPath] = "Unknown";
+                    continue;
+                }
+
+                var typeName = ((AssetClassID)assetInfo.TypeId).ToString();
+                Log.WriteLine($"  [{fileName}] Found AssetPath: '{assetPath}' with type: '{typeName}'");
+                context.AssetNamesToAssetType[assetPath] = ((AssetClassID)assetInfo.TypeId).ToString();
+            }
+
+            context.MainDirectoryInfo = dirInfos[0];
+            context.StreamDataDirectoryInfo = dirInfos.Count > 1 ? dirInfos[1] : null;
             foreach (var assetInfo in inst.file.AssetInfos)
             {
                 if (!CacheManager.Reroutables.TryGetValue((AssetClassID)assetInfo.TypeId, out var reroutableCache))
@@ -49,27 +80,27 @@ internal static partial class Program
                     continue;
                 }
 
-                if (info.StreamDataDirectoryInfo != null && HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
+                if (context.StreamDataDirectoryInfo != null && HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
                 {
                     var pathField = baseField["m_StreamData"]["path"];
-                    if (!pathField.IsNullOrDummy() && pathField.AsString.EndsWith(info.StreamDataDirectoryInfo.Name))
+                    if (!pathField.IsNullOrDummy() && pathField.AsString.EndsWith(context.StreamDataDirectoryInfo.Name))
                     {
-                        info.RemovedStreamRanges.Add(streamData.Offset, streamData);
+                        context.RemovedStreamRanges.Add(streamData.Offset, streamData);
                     }
                 }
 
-                info.PathIDToExternalPPtr[assetInfo.PathId] = new(reroutable);
+                context.PathIDToExternalPPtr[assetInfo.PathId] = new(reroutable);
                 assetInfo.SetRemoved();
 
                 Log.Verbose($"  [{fileName}] Found Reroutable: [{(AssetClassID)assetInfo.TypeId}] '{asset}'");
             }
 
-            if (info.PathIDToExternalPPtr.Count == 0)
+            if (context.PathIDToExternalPPtr.Count == 0)
             {
                 return;
             }
 
-            Log.WriteLine($"  [{fileName}] Found {info.PathIDToExternalPPtr.Count} Reroutable Assets");
+            Log.WriteLine($"  [{fileName}] Found {context.PathIDToExternalPPtr.Count} Reroutable Assets");
             jobTimeScope.Dispose();
             #endregion
 
@@ -77,7 +108,7 @@ internal static partial class Program
             #region Inject External References
             jobTimeScope = new BundleJobScope(fileName, "Injecting External References");
 
-            var fileIndexes = info.PathIDToExternalPPtr.Select(x => x.Value.FileIndex).Distinct();
+            var fileIndexes = context.PathIDToExternalPPtr.Select(x => x.Value.FileIndex).Distinct();
             foreach (var fileIndex in fileIndexes)
             {
                 if (!CacheManager.FileIndexes.TryGetFileName(fileIndex, out var externalFileName))
@@ -93,11 +124,11 @@ internal static partial class Program
                 });
 
                 var fileID = inst.file.Metadata.Externals.Count;
-                info.FileIndexToFileID[fileIndex] = fileID;
+                context.FileIndexToFileID[fileIndex] = fileID;
                 Log.Verbose($"  [{fileName}] Injected Externals: '{externalFileName}' ({fileID})");
             }
 
-            Log.WriteLine($"  [{fileName}] Injected {info.FileIndexToFileID.Count} Externals");
+            Log.WriteLine($"  [{fileName}] Injected {context.FileIndexToFileID.Count} Externals");
             jobTimeScope.Dispose();
             #endregion
 
@@ -116,7 +147,7 @@ internal static partial class Program
 
                 if (HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
                 {
-                    var newOffset = info.RecalculateStreamDataOffset(streamData.Offset);
+                    var newOffset = context.RecalculateStreamDataOffset(streamData.Offset);
                     if (newOffset != streamData.Offset)
                     {
                         baseField["m_StreamData"]["offset"].AsULong = newOffset;
@@ -125,7 +156,7 @@ internal static partial class Program
                 }
 
                 int reroutedCount = 0;
-                info.SearchAndReroutePPtr(baseField, baseField.TypeName, ref reroutedCount);
+                context.SearchAndReroutePPtr(baseField, baseField.TypeName, ref reroutedCount);
 
                 reroutedTotalCount += reroutedCount;
                 if (modified || reroutedCount != 0)
@@ -144,15 +175,15 @@ internal static partial class Program
 
             bundleInst.file.BlockAndDirInfo.DirectoryInfos[0].SetNewData(inst.file);
 
-            if (info.RemovedStreamRanges.Count != 0)
+            if (context.RemovedStreamRanges.Count != 0)
             {
                 var data = bundleInst.file.DataReader;
-                data.Position = info.StreamDataDirectoryInfo.Offset;
+                data.Position = context.StreamDataDirectoryInfo.Offset;
 
-                var length = info.StreamDataDirectoryInfo.DecompressedSize;
+                var length = context.StreamDataDirectoryInfo.DecompressedSize;
                 var newData = new MemoryStream();
                 long pos = 0;
-                foreach ((ulong offset, uint size) in info.RemovedStreamRanges.Values)
+                foreach ((ulong offset, uint size) in context.RemovedStreamRanges.Values)
                 {
                     Log.Verbose($"  [{fileName}] Skip stripped data from: {offset} size: {size}");
                     LargeStreamUtil.CopyBlock(data.BaseStream, newData, pos, (long)offset - pos);
@@ -172,16 +203,20 @@ internal static partial class Program
             #region Save Rerouted Bundle
             jobTimeScope = new BundleJobScope(fileName, "Saving Rerouted Bundle");
 
-            var reroutedFileName = options.NoCompression ? options.GetCompressedFilePath(filePath) : tempFileName;
-            Directory.CreateDirectory(Path.GetDirectoryName(reroutedFileName));
+            var reroutedFile = options.NoCompression ? options.GetCompressedFilePath(filePath) : tempFileName;
+            Directory.CreateDirectory(Path.GetDirectoryName(reroutedFile));
 
-            using var reroutedStream = OpenReroutedBundleStream(reroutedFileName);
+            using var reroutedStream = OpenReroutedBundleStream(reroutedFile);
             using var bundleFileWriter = new AssetsFileWriter(reroutedStream);
             bundleInst.file.Write(bundleFileWriter);
             bundleFileWriter.Flush();
 
             if (options.NoCompression)
             {
+                if (options.GenerateMetadata)
+                {
+                    context.GenerateMetadata(reroutedFile);
+                }
                 jobTimeScope.Dispose();
                 return;
             }
@@ -193,12 +228,18 @@ internal static partial class Program
             #region Compress Saved Bundle
             jobTimeScope = new BundleJobScope(fileName, $"Compressing Saved Bundle (Compression: {options.Compression})");
 
-            var packed = manager.LoadBundleFile(reroutedStream, reroutedFileName, true);
-            var compressedFileName = options.GetCompressedFilePath(filePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(compressedFileName));
+            var packed = manager.LoadBundleFile(reroutedStream, reroutedFile, true);
+            var compressedFile = options.GetCompressedFilePath(filePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(compressedFile));
 
-            using var compressedFileWriter = new AssetsFileWriter(compressedFileName);
+            using var compressedFileWriter = new AssetsFileWriter(compressedFile);
             packed.file.Pack(compressedFileWriter, options.Compression);
+            compressedFileWriter.Dispose();
+
+            if (options.GenerateMetadata)
+            {
+                context.GenerateMetadata(compressedFile);
+            }
 
             jobTimeScope.Dispose();
             #endregion

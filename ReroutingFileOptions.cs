@@ -6,6 +6,7 @@ internal class ReroutingFileOptions
 {
     public AssetBundleCompressionType Compression { get; set; }
     public string OutputFormat { get; set; }
+    public bool GenerateMetadata { get; set; }
 
     public bool NoCompression => Compression == AssetBundleCompressionType.None;
 
