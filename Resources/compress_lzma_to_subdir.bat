@@ -1,0 +1,1 @@
+"ABCDEFG.exe" --output-format "compressed/{filename}" -lzma %*

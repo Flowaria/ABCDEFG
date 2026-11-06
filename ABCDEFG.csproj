@@ -10,14 +10,19 @@
 </PropertyGroup>
 
 <ItemGroup>
-	<Content Include="lib\classdata.tpk">
-		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	</Content>
-</ItemGroup>
-
-<ItemGroup>
   <PackageReference Include="AssetsTools.NET" Version="3.0.5" />
   <PackageReference Include="System.IO.Hashing" Version="10.0.14" />
+</ItemGroup>
+	
+<ItemGroup>
+	<None Update="Resources\classdata.tpk">
+		<TargetPath>lib\classdata.tpk</TargetPath>
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	</None>
+	<None Update="Resources\*.bat">
+		<TargetPath>%(Filename)%(Extension)</TargetPath>
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	</None>
 </ItemGroup>
 
 <Target Name="MoveDependenciesToSubfolder" AfterTargets="Build">
