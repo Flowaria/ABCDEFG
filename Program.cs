@@ -173,8 +173,9 @@ internal static partial class Program
         Log.WriteLine(" --lz4\t\t; Set trailing files compression to LZ4");
         Log.WriteLine(" --lz4hc\t\t; Set trailing files compression to LZ4HC");
         Log.WriteLine(" --nocomp\t; Don't compress trailing files (Rerouting still works)");
-        Log.WriteLine($" --{ArgumentsParser.OPT_OUTPUT_SUBDIR} <sub-directory name> ; Set trailing files output subdirectory (Default: \"\")");
-        Log.WriteLine($" --{ArgumentsParser.OPT_OUTPUT_SUFFIX} <suffix> ; Set trailing files output suffix (Default: -compressed)");
+        Log.WriteLine($" --{ArgumentsParser.OPT_EXCLUDE} <regex> ; Exclude trailing files that match RegEx pattern (Default: None)");
+        Log.WriteLine($" --{ArgumentsParser.OPT_OUTPUT_FORMAT} <format> ; Set trailing files output format (Default: {{FileName}}-compressed)");
+        Log.WriteLine(" └ Allowed replacement texts: {FileName}");
         Log.WriteLine("--------");
         Log.WriteLine("Example:");
         Log.WriteLine(" ABCDEFG -lzma \"geo_lab_01\" -lz4 \"gearpart_stock\" \"gearpart_front\"");

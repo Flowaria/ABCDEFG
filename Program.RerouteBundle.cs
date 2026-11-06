@@ -10,6 +10,7 @@ internal static partial class Program
     static void RerouteBundle(string filePath, ReroutingFileOptions options)
     {
         var fileName = Path.GetFileName(filePath);
+        var tempFileName = Path.Combine(Paths.TempPath, Guid.NewGuid().ToString() + ".tmp");
         var manager = AssetsManagerPool.GetInstance();
 
         try
@@ -171,7 +172,9 @@ internal static partial class Program
             #region Save Rerouted Bundle
             jobTimeScope = new BundleJobScope(fileName, "Saving Rerouted Bundle");
 
-            var reroutedFileName = options.NoCompression ? options.GetCompressedFilePath(filePath) : options.GetReroutedFilePath(filePath);
+            var reroutedFileName = options.NoCompression ? options.GetCompressedFilePath(filePath) : tempFileName;
+            Directory.CreateDirectory(Path.GetDirectoryName(reroutedFileName));
+
             using var reroutedStream = OpenReroutedBundleStream(reroutedFileName);
             using var bundleFileWriter = new AssetsFileWriter(reroutedStream);
             bundleInst.file.Write(bundleFileWriter);
@@ -191,7 +194,10 @@ internal static partial class Program
             jobTimeScope = new BundleJobScope(fileName, $"Compressing Saved Bundle (Compression: {options.Compression})");
 
             var packed = manager.LoadBundleFile(reroutedStream, reroutedFileName, true);
-            using var compressedFileWriter = new AssetsFileWriter(options.GetCompressedFilePath(filePath));
+            var compressedFileName = options.GetCompressedFilePath(filePath);
+            Directory.CreateDirectory(Path.GetDirectoryName(compressedFileName));
+
+            using var compressedFileWriter = new AssetsFileWriter(compressedFileName);
             packed.file.Pack(compressedFileWriter, options.Compression);
 
             jobTimeScope.Dispose();
@@ -205,7 +211,10 @@ internal static partial class Program
         finally
         {
             manager.UnloadAll(unloadClassData: false);
-            File.Delete(options.GetReroutedFilePath(filePath));
+
+            if (Directory.Exists(Paths.TempPath))
+                File.Delete(tempFileName);
+
             GC.Collect();
         }
     }

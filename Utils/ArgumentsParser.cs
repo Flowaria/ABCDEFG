@@ -1,5 +1,6 @@
 ﻿using AssetsTools.NET;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace ABCDEFG.Utils;
 
@@ -10,8 +11,8 @@ internal static class ArgumentsParser
     public const string OPT_LZ4 = "lz4";
     public const string OPT_LZ4HC = "lz4hc";
 
-    public const string OPT_OUTPUT_SUFFIX = "output-suffix";
-    public const string OPT_OUTPUT_SUBDIR = "output-dir";
+    public const string OPT_OUTPUT_FORMAT = "output-format";
+    public const string OPT_EXCLUDE = "exclude";
 
     public static Dictionary<string, ReroutingFileOptions> Parse(string[] args)
     {
@@ -21,22 +22,31 @@ internal static class ArgumentsParser
         var compression = AssetBundleCompressionType.LZMA;
         var optionsData = new Dictionary<string, string>
         {
-            [OPT_OUTPUT_SUFFIX] = "-compressed",
-            [OPT_OUTPUT_SUBDIR] = ""
+            [OPT_OUTPUT_FORMAT] = "{filename}-compressed",
+            [OPT_EXCLUDE] = ""
         };
 
+        Regex excludeRegex = null;
         foreach (var arg in args)
         {
             if (shouldParseData)
             {
                 optionsData[parsingOptionName] = arg;
+                if (parsingOptionName == OPT_EXCLUDE)
+                {
+                    if (string.IsNullOrEmpty(arg))
+                        excludeRegex = null;
+                    else
+                        excludeRegex = new Regex(arg);
+                }
+
                 shouldParseData = false;
                 continue;
             }
 
             if (arg.StartsWith("--"))
             {
-                var optionName = arg[1..].ToLower();
+                var optionName = arg[2..].ToLower();
                 ParseOptions(optionName, optionsData, ref compression, ref shouldParseData);
                 if (shouldParseData)
                 {
@@ -62,11 +72,18 @@ internal static class ArgumentsParser
 
         void AddFileToReroute(string fullPath)
         {
+            if (excludeRegex != null)
+            {
+                if (excludeRegex.IsMatch(Path.GetFileName(fullPath)))
+                {
+                    return;
+                }
+            }
+
             parsed.Add(fullPath, new ReroutingFileOptions()
             {
                 Compression = compression,
-                OutputSuffix = optionsData[OPT_OUTPUT_SUFFIX],
-                OutputSubdir = optionsData[OPT_OUTPUT_SUBDIR]
+                OutputFormat = optionsData[OPT_OUTPUT_FORMAT]
             });
         }
 
