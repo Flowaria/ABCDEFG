@@ -7,7 +7,7 @@ namespace ABCDEFG;
 
 internal static partial class Program
 {
-    static string Version => "0.1.1";
+    static string Version => "0.2.0";
 
     static void Main(string[] args)
     {
