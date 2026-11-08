@@ -80,13 +80,9 @@ internal static partial class Program
                     continue;
                 }
 
-                if (context.StreamDataDirectoryInfo != null && HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
+                if (context.StreamDataDirectoryInfo != null && HasStreamDataField(baseField, context, out var streamData) && streamData.Size > 0)
                 {
-                    var pathField = baseField["m_StreamData"]["path"];
-                    if (!pathField.IsNullOrDummy() && pathField.AsString.EndsWith(context.StreamDataDirectoryInfo.Name))
-                    {
-                        context.RemovedStreamRanges.Add(streamData.Offset, streamData);
-                    }
+                    context.RemovedStreamRanges.Add(streamData.Offset, streamData);
                 }
 
                 context.PathIDToExternalPPtr[assetInfo.PathId] = new(reroutable);
@@ -145,7 +141,7 @@ internal static partial class Program
                 var baseField = manager.GetBaseField(inst, assetInfo);
                 var modified = false;
 
-                if (HasStreamDataField(baseField, out var streamData) && streamData.Size > 0)
+                if (HasStreamDataField(baseField, context, out var streamData) && streamData.Size > 0)
                 {
                     var newOffset = context.RecalculateStreamDataOffset(streamData.Offset);
                     if (newOffset != streamData.Offset)
@@ -178,18 +174,18 @@ internal static partial class Program
             if (context.RemovedStreamRanges.Count != 0)
             {
                 var data = bundleInst.file.DataReader;
-                data.Position = context.StreamDataDirectoryInfo.Offset;
-
+                var streamOffset = context.StreamDataDirectoryInfo.Offset;
                 var length = context.StreamDataDirectoryInfo.DecompressedSize;
                 var newData = new MemoryStream();
+
                 long pos = 0;
                 foreach ((ulong offset, uint size) in context.RemovedStreamRanges.Values)
                 {
                     Log.Verbose($"  [{fileName}] Skip stripped data from: {offset} size: {size}");
-                    LargeStreamUtil.CopyBlock(data.BaseStream, newData, pos, (long)offset - pos);
+                    LargeStreamUtil.CopyBlock(data.BaseStream, newData, streamOffset + pos, (long)offset - pos);
                     pos = (long)(offset + size);
                 }
-                LargeStreamUtil.CopyBlock(data.BaseStream, newData, pos, length - pos);
+                LargeStreamUtil.CopyBlock(data.BaseStream, newData, streamOffset + pos, length - pos);
 
                 bundleInst.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(newData.ToArray());
                 Log.WriteLine($"  [{fileName}] Stripped {LargeStreamUtil.BufferLengthToString(length - newData.Length)} from StreamData");
@@ -272,7 +268,7 @@ internal static partial class Program
         }
     }
 
-    static bool HasStreamDataField(AssetTypeValueField parentField, out StreamDataRange dataRange)
+    static bool HasStreamDataField(AssetTypeValueField parentField, ReroutingContext context, out StreamDataRange dataRange)
     {
         var streamData = parentField["m_StreamData"];
         if (streamData.IsNullOrDummy())
@@ -284,6 +280,13 @@ internal static partial class Program
 
         var offsetField = streamData["offset"];
         if (offsetField.IsNullOrDummy())
+            goto Invalid;
+
+        var pathField = streamData["path"];
+        if (pathField.IsNullOrDummy())
+            goto Invalid;
+
+        if (!pathField.AsString.EndsWith(context.StreamDataDirectoryInfo.Name))
             goto Invalid;
 
         dataRange = new StreamDataRange(offsetField.AsULong, sizeField.AsUInt);
