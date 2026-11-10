@@ -80,7 +80,7 @@ internal static partial class Program
                     continue;
                 }
 
-                if (context.StreamDataDirectoryInfo != null && HasStreamDataField(baseField, context, out var streamData) && streamData.Size > 0)
+                if (HasStreamDataField(baseField, context, out var streamData) && streamData.Size > 0)
                 {
                     context.RemovedStreamRanges.Add(streamData.Offset, streamData);
                 }
@@ -169,7 +169,7 @@ internal static partial class Program
             #region Align StreamData
             jobTimeScope = new BundleJobScope(fileName, "Aligning StreamData");
 
-            bundleInst.file.BlockAndDirInfo.DirectoryInfos[0].SetNewData(inst.file);
+            context.MainDirectoryInfo.SetNewData(inst.file);
 
             if (context.RemovedStreamRanges.Count != 0)
             {
@@ -187,7 +187,7 @@ internal static partial class Program
                 }
                 LargeStreamUtil.CopyBlock(data.BaseStream, newData, streamOffset + pos, length - pos);
 
-                bundleInst.file.BlockAndDirInfo.DirectoryInfos[1].SetNewData(newData.ToArray());
+                context.StreamDataDirectoryInfo.SetNewData(newData.ToArray());
                 Log.WriteLine($"  [{fileName}] Stripped {LargeStreamUtil.BufferLengthToString(length - newData.Length)} from StreamData");
                 newData.Dispose();
             }
@@ -270,6 +270,9 @@ internal static partial class Program
 
     static bool HasStreamDataField(AssetTypeValueField parentField, ReroutingContext context, out StreamDataRange dataRange)
     {
+        if (context.StreamDataDirectoryInfo == null)
+            goto Invalid;
+
         var streamData = parentField["m_StreamData"];
         if (streamData.IsNullOrDummy())
             goto Invalid;
