@@ -27,6 +27,9 @@ internal class FileIndexCache(string cacheFile) : Cache(cacheFile)
             var fileName = Reader.ReadString();
             _FileNames[fileIndex] = fileName;
         }
+
+        if (FileStream.Position != FileStream.Length)
+            throw new InvalidDataException("FileIndex Cache is invalid! Regenerate the Cache!");
     }
 
     public override void ClearCache()

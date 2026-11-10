@@ -10,6 +10,7 @@ internal abstract class ReroutableAssetCache(string cacheFile) : Cache(cacheFile
     public abstract ReroutableAsset ReadAssetCache();
     public abstract ReroutableAsset FromBaseField(int fileIndex, long pathID, AssetTypeValueField baseField);
     public abstract bool FindRerouteTarget(ReroutableAsset assetFromAssetBundle, out ReroutableAsset reroutableAsset);
+    public abstract int GetCollisionCount();
 }
 
 internal class ReroutableAssetCache<T>(string cacheFile) : ReroutableAssetCache(cacheFile) where T : ReroutableAsset, new()
@@ -17,7 +18,9 @@ internal class ReroutableAssetCache<T>(string cacheFile) : ReroutableAssetCache(
     public override string AssetTypeName => field ?? typeof(T).Name;
     public override bool IsEmpty => _Assets.Count == 0;
 
-    private List<ReroutableAsset> _Assets = [];
+    private readonly List<ReroutableAsset> _Assets = [];
+    private readonly HashSet<string> _CollisionLookup = [];
+    private int _CollisionCounter = 0;
 
     public sealed override bool FindRerouteTarget(ReroutableAsset assetFromAssetBundle, out ReroutableAsset reroutableAsset)
     {
@@ -38,7 +41,22 @@ internal class ReroutableAssetCache<T>(string cacheFile) : ReroutableAssetCache(
     {
         var asset = ReroutableAsset.FromBaseField<T>(fileIndex, pathID, baseField);
         ReroutableAsset.Write(asset, Writer);
+
+        var lookupString = asset.ToString();
+        if (_CollisionLookup.Contains(lookupString))
+        {
+            _CollisionCounter++;
+            Log.Error($"Found colliding reroutable! [{AssetTypeName}] '{lookupString}'");
+        }
+
+        _CollisionLookup.Add(lookupString);
+
         return asset;
+    }
+
+    public override int GetCollisionCount()
+    {
+        return _CollisionCounter;
     }
 
     public override ReroutableAsset FromBaseField(int fileIndex, long pathID, AssetTypeValueField baseField)
@@ -60,6 +78,9 @@ internal class ReroutableAssetCache<T>(string cacheFile) : ReroutableAssetCache(
             var asset = ReadAssetCache();
             _Assets.Add(asset);
         }
+
+        if (FileStream.Position != FileStream.Length)
+            throw new InvalidDataException($"Reroutable Cache ({AssetTypeName}) is invalid! Regenerate the Cache!");
     }
 
     public override void ClearCache()

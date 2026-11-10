@@ -58,6 +58,10 @@ internal static class CacheManager
 
         foreach (var reroutableCache in Reroutables.Values)
         {
+            var collisions = reroutableCache.GetCollisionCount();
+            if (collisions > 0)
+                Log.Error($"Found {collisions} colliding {reroutableCache.AssetTypeName}!");
+
             reroutableCache.FileStream.Flush();
         }
         FileIndexes.FileStream.Flush();
