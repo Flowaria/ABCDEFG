@@ -9,7 +9,7 @@ internal abstract partial class ReroutableAsset
     public long PathID { get; set; }
     public string Name { get; set; }
     public abstract bool IsSameAsset(ReroutableAsset other);
-    public virtual void ReadExtraFromBaseField(AssetTypeValueField baseField) { }
+    public virtual void ReadExtra(AssetContext context) { }
     public virtual void ReadExtra(BinaryReader reader) { }
     public virtual void WriteExtra(BinaryWriter writer) { }
 
@@ -17,7 +17,7 @@ internal abstract partial class ReroutableAsset
     private static partial Regex UnderScoreNumsSuffix();
     private static readonly Regex s_UnderScoreNumsSuffix = UnderScoreNumsSuffix();
 
-    public virtual void ReadNameFromBaseField(AssetTypeValueField baseField)
+    public virtual void ReadName(AssetTypeValueField baseField)
     {
         Name = baseField["m_Name"].AsString;
     }
@@ -36,13 +36,14 @@ internal abstract partial class ReroutableAsset
         return false;
     }
 
-    public static T FromBaseField<T>(int fileIndex, long pathID, AssetTypeValueField baseField) where T : ReroutableAsset, new()
+    public static T FromBaseField<T>(int fileIndex, AssetContext context) where T : ReroutableAsset, new()
     {
+        var baseField = context.baseField;
         var asset = new T();
         asset.FileIndex = fileIndex;
-        asset.PathID = pathID;
-        asset.ReadNameFromBaseField(baseField);
-        asset.ReadExtraFromBaseField(baseField);
+        asset.PathID = context.assetFileInfo.PathId;
+        asset.ReadName(baseField);
+        asset.ReadExtra(context);
         return asset;
     }
 

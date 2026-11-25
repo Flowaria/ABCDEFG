@@ -1,14 +1,13 @@
 ﻿using ABCDEFG.Reroutables;
-using AssetsTools.NET;
 
 namespace ABCDEFG.Caches;
 
 internal abstract class ReroutableAssetCache(string cacheFile) : Cache(cacheFile)
 {
     public abstract string AssetTypeName { get; }
-    public abstract ReroutableAsset WriteAssetCache(int fileIndex, long pathID, AssetTypeValueField baseField);
+    public abstract ReroutableAsset WriteAssetCache(int fileIndex, AssetContext context);
     public abstract ReroutableAsset ReadAssetCache();
-    public abstract ReroutableAsset FromBaseField(int fileIndex, long pathID, AssetTypeValueField baseField);
+    public abstract ReroutableAsset FromBaseField(int fileIndex, AssetContext context);
     public abstract bool FindRerouteTarget(ReroutableAsset assetFromAssetBundle, out ReroutableAsset reroutableAsset);
     public abstract int GetCollisionCount();
 }
@@ -37,9 +36,9 @@ internal class ReroutableAssetCache<T>(string cacheFile) : ReroutableAssetCache(
         return false;
     }
 
-    public override ReroutableAsset WriteAssetCache(int fileIndex, long pathID, AssetTypeValueField baseField)
+    public override ReroutableAsset WriteAssetCache(int fileIndex, AssetContext context)
     {
-        var asset = ReroutableAsset.FromBaseField<T>(fileIndex, pathID, baseField);
+        var asset = ReroutableAsset.FromBaseField<T>(fileIndex, context);
         ReroutableAsset.Write(asset, Writer);
 
         var lookupString = asset.ToString();
@@ -59,9 +58,9 @@ internal class ReroutableAssetCache<T>(string cacheFile) : ReroutableAssetCache(
         return _CollisionCounter;
     }
 
-    public override ReroutableAsset FromBaseField(int fileIndex, long pathID, AssetTypeValueField baseField)
+    public override ReroutableAsset FromBaseField(int fileIndex, AssetContext context)
     {
-        return ReroutableAsset.FromBaseField<T>(fileIndex, pathID, baseField);
+        return ReroutableAsset.FromBaseField<T>(fileIndex, context);
     }
 
     public override ReroutableAsset ReadAssetCache()

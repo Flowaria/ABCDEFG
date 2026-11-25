@@ -15,7 +15,7 @@ internal class Shader : ReroutableAsset
         return true;
     }
 
-    public override void ReadNameFromBaseField(AssetTypeValueField baseField)
+    public override void ReadName(AssetTypeValueField baseField)
     {
         Name = baseField["m_ParsedForm"]["m_Name"].AsString;
     }

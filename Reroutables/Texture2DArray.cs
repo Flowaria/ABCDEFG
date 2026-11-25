@@ -1,6 +1,4 @@
-﻿using AssetsTools.NET;
-
-namespace ABCDEFG.Reroutables;
+﻿namespace ABCDEFG.Reroutables;
 
 internal class Texture2DArray : ReroutableAsset
 {
@@ -28,8 +26,9 @@ internal class Texture2DArray : ReroutableAsset
         return true;
     }
 
-    public override void ReadExtraFromBaseField(AssetTypeValueField baseField)
+    public override void ReadExtra(AssetContext context)
     {
+        var baseField = context.baseField;
         Width = baseField["m_Width"].AsInt;
         Height = baseField["m_Height"].AsInt;
         Depth = baseField["m_Depth"].AsInt;

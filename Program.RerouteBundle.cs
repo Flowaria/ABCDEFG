@@ -1,4 +1,5 @@
 ﻿using ABCDEFG.Caches;
+using ABCDEFG.Reroutables;
 using ABCDEFG.Utils;
 using AssetsTools.NET;
 using AssetsTools.NET.Extra;
@@ -73,7 +74,8 @@ internal static partial class Program
                 }
 
                 var baseField = manager.GetBaseField(inst, assetInfo);
-                var asset = reroutableCache.FromBaseField(0, assetInfo.PathId, baseField);
+                var assetContext = new AssetContext(inst, assetInfo, baseField);
+                var asset = reroutableCache.FromBaseField(0, assetContext);
                 if (!reroutableCache.FindRerouteTarget(asset, out var reroutable))
                 {
                     Log.Warning($"  [{fileName}] Found Non-Reroutable: [{(AssetClassID)assetInfo.TypeId}] '{asset}'");

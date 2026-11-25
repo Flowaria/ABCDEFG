@@ -1,5 +1,4 @@
-﻿using AssetsTools.NET;
-using System.IO.Hashing;
+﻿using System.IO.Hashing;
 
 namespace ABCDEFG.Reroutables;
 
@@ -33,8 +32,9 @@ internal class Mesh : ReroutableAsset
         return true;
     }
 
-    public override void ReadExtraFromBaseField(AssetTypeValueField baseField)
+    public override void ReadExtra(AssetContext context)
     {
+        var baseField = context.baseField;
         var indexBuffer = baseField["m_IndexBuffer"];
         var vertexData = baseField["m_VertexData"];
 

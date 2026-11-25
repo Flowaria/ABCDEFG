@@ -48,6 +48,8 @@ internal static class CacheManager
             .Where(file => !file.Extension.Equals(".resS", StringComparison.Ordinal))
             .Where(file => !file.Extension.Equals(".config", StringComparison.Ordinal))
             .Where(file => !file.Extension.Equals(".info", StringComparison.Ordinal))
+            .Where(file => !file.Extension.Equals(".resource", StringComparison.Ordinal))
+            .Where(file => !file.Name.StartsWith("level"))
             .OrderBy(file => file.FullName);
 
         int fileIndex = 0;
@@ -87,7 +89,8 @@ internal static class CacheManager
                 }
 
                 var baseField = manager.GetBaseField(inst, assetInfo);
-                var asset = reroutableCache.WriteAssetCache(fileIndex, assetInfo.PathId, baseField);
+                var assetContext = new AssetContext(inst, assetInfo, baseField);
+                var asset = reroutableCache.WriteAssetCache(fileIndex, assetContext);
                 rawReferenceNumbers++;
                 Log.WriteLine($" - [{(AssetClassID)assetInfo.TypeId}] '{asset}'");
             }

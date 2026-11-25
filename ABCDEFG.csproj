@@ -11,6 +11,8 @@
 
 <ItemGroup>
   <PackageReference Include="AssetsTools.NET" Version="3.0.5" />
+  <PackageReference Include="AssetsTools.NET.Texture" Version="3.0.2" />
+  <PackageReference Include="SkiaSharp" Version="4.158.0-preview.1.26556.2" />
   <PackageReference Include="System.IO.Hashing" Version="10.0.14" />
 </ItemGroup>
 	
