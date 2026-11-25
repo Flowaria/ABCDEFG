@@ -15,6 +15,34 @@ internal static class ArgumentsParser
     public const string OPT_EXCLUDE = "exclude";
     public const string OPT_WRITE_METADATA = "write-metadata";
 
+    public static void WriteUsage()
+    {
+        Log.WriteLine("--------");
+        Log.WriteLine("Usage:");
+        Log.WriteLine(" ABCDEFG");
+        Log.WriteLine(" ABCDEFG --cache");
+        Log.WriteLine(" └ Generate Asset ID cache from given GTFO_Data path");
+        Log.WriteLine();
+        Log.WriteLine(" ABCDEFG <file/folder path> <file/folder path 2> ...");
+        Log.WriteLine(" ABCDEFG [--option] <file/folder path> [--option] <file/folder path 2> ...");
+        Log.WriteLine(" └ Compress given file(s) as LZMA (or option driven) compression");
+        Log.WriteLine("--------");
+        Log.WriteLine("Options:");
+        Log.WriteLine($" --{OPT_LZMA}\t\t; Set trailing files compression to LZMA");
+        Log.WriteLine($" --{OPT_LZ4}\t\t; Set trailing files compression to LZ4");
+        Log.WriteLine($" --{OPT_LZ4HC}\t\t; Set trailing files compression to LZ4HC");
+        Log.WriteLine($" --{OPT_NOCOMP}\t; Don't compress trailing files (Rerouting still works)");
+        Log.WriteLine($" --{OPT_EXCLUDE} <regex> ; Exclude trailing files that match RegEx pattern (Default: None)");
+        Log.WriteLine($" --{OPT_OUTPUT_FORMAT} <format> ; Set trailing files output format (Default: {{FileName}}-compressed)");
+        Log.WriteLine(" └ Allowed replacement texts: {FileName}");
+        Log.WriteLine($" --{OPT_WRITE_METADATA} <true/false> ; Toggle if trailing files also generate .meta.json (Default: true)");
+        Log.WriteLine("--------");
+        Log.WriteLine("Example:");
+        Log.WriteLine(" ABCDEFG --lzma \"geo_lab_01\" --lz4 \"gearpart_stock\" \"gearpart_front\"");
+        Log.WriteLine(" └ This will compress 'geo_lab_01' file as LZMA. 'gearpart_stock' and 'gearpart_front' as LZ4");
+        Log.WriteLine("--------");
+    }
+
     public static Dictionary<string, ReroutingFileOptions> Parse(string[] args)
     {
         var parsed = new Dictionary<string, ReroutingFileOptions>(FileStringComparator());
